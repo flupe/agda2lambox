@@ -9,7 +9,7 @@ import Control.DeepSeq ( NFData(..) )
 import System.Console.GetOpt ( OptDescr(Option), ArgDescr(ReqArg) )
 
 import Data.Version ( showVersion )
-import Paths_agda2min ( version )
+import Paths_agda2lambox ( version )
 
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Internal ( qnameName, qnameModule )

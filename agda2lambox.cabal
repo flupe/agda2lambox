@@ -12,11 +12,11 @@ source-repository head
   type:     git
   location: https://github.com/omelkonian/agda-minimal-backend.git
 
-executable agda2min
+executable agda2lambox
   hs-source-dirs:      src
   main-is:             Main.hs
   other-modules:       Paths_agda2lambox
   autogen-modules:     Paths_agda2lambox
   build-depends:       base >= 4.10 && < 4.18,
-                       Agda >= 2.6.7 && < 2.6.8,
+                       Agda >= 2.6.4 && <= 2.6.4.3,
                        deepseq >= 1.4.4 && < 1.6
