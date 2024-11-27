@@ -1,7 +1,7 @@
 cabal-version:       2.2
-name:                agda2min
+name:                agda2lambox
 version:             1.1
-author:              ???
+author:              Orestis Melkonian, Carlos Tomé Cortiñas
 category:            Language, Compiler
 build-type:          Simple
 synopsis:            Compiling Agda code to ??.
@@ -15,8 +15,8 @@ source-repository head
 executable agda2min
   hs-source-dirs:      src
   main-is:             Main.hs
-  other-modules:       Paths_agda2min
-  autogen-modules:     Paths_agda2min
+  other-modules:       Paths_agda2lambox
+  autogen-modules:     Paths_agda2lambox
   build-depends:       base >= 4.10 && < 4.18,
-                       Agda >= 2.6.4 && < 2.6.5,
+                       Agda >= 2.6.7 && < 2.6.8,
                        deepseq >= 1.4.4 && < 1.6
