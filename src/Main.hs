@@ -16,7 +16,7 @@ import Agda.Syntax.Internal ( qnameName, qnameModule )
 import Agda.Syntax.TopLevelModuleName ( TopLevelModuleName, moduleNameToFileName )
 
 import Agda.Compiler.Common ( curIF, compileDir )
-import Agda.Compiler.Backend ( Backend(..), Backend'(..), Recompile(..), IsMain )
+import Agda.Compiler.Backend ( Backend_boot(..), Backend(..), Backend'_boot(..), Backend'(..), Recompile(..), IsMain )
 
 import Agda.TypeChecking.Monad.Base ( Definition(..) )
 import Agda.TypeChecking.Monad

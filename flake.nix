@@ -18,7 +18,6 @@
           packages = p: [agda2lambox];
           buildInputs = with pkgs.haskellPackages; [
             cabal-install
-            haskell-language-server
           ];
         };
       });
