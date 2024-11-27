@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module LambdaBox where
 
 import Data.Maybe ( fromMaybe )
@@ -9,7 +8,7 @@ import Control.DeepSeq ( NFData(..) )
 import System.Console.GetOpt ( OptDescr(Option), ArgDescr(ReqArg) )
 
 import Data.Version ( showVersion )
-import Paths_agda2min ( version )
+import Paths_agda2lambox ( version )
 
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Internal ( qnameName, qnameModule )
@@ -40,6 +39,6 @@ data Term
   | App Term Term
   | Const KName
   | Ctor Inductive Int
-  | Case Inductive Int Term [(Nat, Term)]
+  | Case Inductive Int Term [(Int, Term)]
   | Fix [Def] Int
   deriving (Eq, Show)

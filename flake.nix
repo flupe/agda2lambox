@@ -1,5 +1,5 @@
 {
-  description = "Agda2lambox";
+  description = "agda2lambox";
 
   inputs.nixpkgs.url = github:NixOS/nixpkgs;
   inputs.flake-utils.url = github:numtide/flake-utils;
@@ -18,6 +18,9 @@
           packages = p: [agda2lambox];
           buildInputs = with pkgs.haskellPackages; [
             cabal-install
+            cabal2nix
+            haskell-language-server
+            pkgs.agda
           ];
         };
       });

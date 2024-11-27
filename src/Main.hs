@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, RecordWildCards #-}
+{-# LANGUAGE RecordWildCards #-}
 module Main where
 
 import Data.Maybe ( fromMaybe )
