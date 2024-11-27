@@ -2,3 +2,6 @@ _build
 dist
 dist-newstyle
 *~
+
+.direnv
+result
