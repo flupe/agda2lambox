@@ -1,0 +1,4 @@
+:def! . readFile
+:def! reset (\_ -> return ":. .ghci\n")
+:def! test (\x -> return $ ":r\n :set args -itest -otest/ test/" <> x <> ".agda\n main")
+

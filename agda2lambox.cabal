@@ -4,22 +4,39 @@ version:             1.1
 author:              Orestis Melkonian, Carlos Tomé Cortiñas, Bohdan Liesnikov
 category:            Language, Compiler
 build-type:          Simple
-synopsis:            Compiling Agda code to ??.
+synopsis:            Compiling Agda code to λ-box.
 
 extra-doc-files:    README.md
 
 source-repository head
   type:     git
-  location: https://github.com/omelkonian/agda-minimal-backend.git
+  location: https://github.com/omelkonian/agda2lambox.git
 
 executable agda2lambox
   hs-source-dirs:      src
   main-is:             Main.hs
-  other-modules:       LambdaBox,
+  other-modules:       Agda.Lib,
+                       Agda.Utils,
+                       Agda,
+                       Agda2Lambox.Monad,
+                       Agda2Lambox.Convert.Class,
+                       Agda2Lambox.Convert.Terms,
+                       Agda2Lambox.Convert,
+                       Agda2Lambox,
+                       Utils,
+                       LambdaBox,
                        Paths_agda2lambox
   autogen-modules:     Paths_agda2lambox
-  build-depends:       base >= 4.10 && < 4.20,
-                       Agda >= 2.7 && < 2.8,
-                       deepseq >= 1.4.4 && < 1.6
+  build-depends:       base >= 4.10 && < 4.18,
+                       Agda >= 2.7 && <= 2.8,
+                       deepseq >= 1.4.4 && < 1.6,
+                       pretty-show,
+                       mtl
   default-language:    Haskell2010
-  default-extensions:  LambdaCase
+  default-extensions:
+    LambdaCase RecordWildCards PatternSynonyms TupleSections
+    ViewPatterns PatternGuards
+    ScopedTypeVariables
+    TypeFamilies TypeOperators TypeApplications
+    FunctionalDependencies TypeSynonymInstances ConstraintKinds
+    DoAndIfThenElse BlockArguments MultiWayIf
