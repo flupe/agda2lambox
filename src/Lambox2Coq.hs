@@ -5,13 +5,19 @@ import Data.Bifunctor(bimap)
 import Data.List(intercalate)
 
 import Agda2Lambox.Convert.Class(type (~>)(..), (:~>))
-import LambdaBox(Def(..), Term(..))
+import LambdaBox(Def(..), Name(..), Term(..))
+
+-- Converting the Haskell LambdaBox AST to MetaCoq's LambdaBox AST
 
 type Coq = String
 
+name2Coq :: Name -> Coq
+name2Coq Anon = "nAnon"
+name2Coq (Named i) = "(nNamed " <> show i <> ")"
+
 def2Coq :: Def -> Coq
 def2Coq (Def name term rarg) =
-  "{| name := " <> show name <>
+  "{| name := " <> name2Coq name <>
   "; dbody := " <> term2Coq term <>
   "; rarg := " <> show rarg <>
   "|}"
@@ -20,10 +26,10 @@ term2Coq :: Term -> Coq
 term2Coq =  \case
   Box -> term "tBox" []
   BVar n -> term "tRel" [show n] -- TODO: Not sure if tRel is the right constructor
-  FVar x -> term "tVar" [show x]
-  Lam x e -> term "tLambda" [show x, term2Coq e]
-  Let x b e -> term "tLetIn" [show x, term2Coq b, term2Coq e]
-  App f a -> term "tApp" [term2Coq f, term2Coq a]
+  FVar i -> term "tVar" [show i]
+  Lam na e -> term "tLambda" [name2Coq na, term2Coq e]
+  Let na b e -> term "tLetIn" [name2Coq na, term2Coq b, term2Coq e]
+  App f e -> term "tApp" [term2Coq f, term2Coq e]
   Const k -> term "tConst" [show k]
   Ctor ind idx -> term "tConstruct" [show ind, show idx]
   Case ind n c brs ->
@@ -44,6 +50,10 @@ term2Coq =  \case
 
     list :: [String] -> String
     list ss = "[" <> intercalate "; " ss <> "]"
+
+instance Name ~> Coq where
+  go :: Name :~> Coq
+  go = pure . name2Coq
 
 instance Def ~> Coq where
   go :: Def :~> Coq
