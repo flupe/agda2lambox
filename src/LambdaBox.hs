@@ -27,7 +27,8 @@ data Type
   -- Unclear whether this would be a De Bruijn level or universe level.
   | TVar Int
   | TInd Inductive
-  | TConst KName 
+  | TConst KName
+  deriving (Eq , Show)
     
 
 data Term

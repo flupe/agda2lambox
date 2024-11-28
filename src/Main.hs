@@ -12,6 +12,7 @@ import Data.Version ( showVersion )
 import Paths_agda2lambox ( version )
 
 import Agda.Lib
+import Agda.Utils (pp)
 
 import qualified LambdaBox as L
 import Agda2Lambox.Convert ( convert )
@@ -78,7 +79,15 @@ compile opts tlm _ Defn{..}
       Nothing -> return Nothing
       Just (CompilerPragma _ _) -> do
         Just tterm <- toTreeless EagerEvaluation defName
-        Just . (CompiledDef defName tterm) <$> runC0 (convert tterm)
+        tm <- runC0 defName (convert tterm)
+        let tm' = L.Fix [L.Def (L.Named $ pp defName) tm 0] 0
+        Function{..} <- return theDef
+        Just ds <- return funMutual
+        case ds of
+          []  -> return $ Just $ CompiledDef defName tterm tm
+          [x] -> return $ Just $ CompiledDef defName tterm tm'
+          _ -> error "No mutual functons supported yet" 
+
 
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
             -> [CompiledDef]
