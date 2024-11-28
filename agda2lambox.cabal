@@ -25,6 +25,7 @@ executable agda2lambox
                        Agda2Lambox,
                        Utils,
                        LambdaBox,
+                       Lambox2Coq,
                        Paths_agda2lambox
   autogen-modules:     Paths_agda2lambox
   build-depends:       base >= 4.10 && < 4.18,
