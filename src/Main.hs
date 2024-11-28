@@ -34,11 +34,14 @@ type ModuleEnv   = ()
 type ModuleRes   = ()
 data CompiledDef' = CompiledDef
   { name :: QName
-  , term :: L.Term
+  , tterm :: TTerm
+  , lterm :: L.Term
   }
 
 instance Show CompiledDef' where
-  show CompiledDef{..} = prettyShow (qnameName name) <> " = " <> show term
+  show CompiledDef{..} =
+    unlines [ prettyShow (qnameName name) <> " = " <> prettyShow tterm
+            , prettyShow (qnameName name) <> " = " <> show lterm ]
 
 type CompiledDef = Maybe CompiledDef'
 
@@ -75,7 +78,7 @@ compile opts tlm _ Defn{..}
       Nothing -> return Nothing
       Just (CompilerPragma _ _) -> do
         Just tterm <- toTreeless EagerEvaluation defName
-        Just . (CompiledDef defName) . fst <$> runC0 (convert tterm)
+        Just . (CompiledDef defName tterm) <$> runC0 (convert tterm)
 
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
             -> [CompiledDef]

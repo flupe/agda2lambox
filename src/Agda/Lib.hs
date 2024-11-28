@@ -46,6 +46,7 @@ import Agda.Syntax.Common
   ( Arg, unArg, defaultArg, defaultArgInfo
   , ArgInfo
   , ArgName, bareNameWithDefault
+  , Erased(..)
   , LensQuantity(..), hasQuantity0
   , LensHiding(..), visible
   , MetaId(..), NameId(NameId)
