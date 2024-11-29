@@ -15,21 +15,20 @@ data Name = Anon | Named Ident
 data Def = Def Name Term Int
   deriving (Eq, Show)
 
--- Taken from: 
+-- Taken from:
 -- https://github.com/MetaCoq/metacoq/blob/coq-8.20/erasure/theories/Typed/ExAst.v
 data Type
   = TBox
   | TAny
   | TArr Type Type
   | TApp Type Type
-  
+
   -- According to the Coq file, the int is the "Level of type variable".
   -- Unclear whether this would be a De Bruijn level or universe level.
   | TVar Int
   | TInd Inductive
   | TConst KName
   deriving (Eq , Show)
-    
 
 data Term
   = Box

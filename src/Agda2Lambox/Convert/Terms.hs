@@ -27,14 +27,13 @@ instance A.TTerm ~> L.Term where
     A.TDef qn ->
       inDefName qn
         (return $ L.FVar (A.prettyShow qn))
-        \ix -> return $ L.BVar ix 
-                                             
+        \ix -> return $ L.BVar ix
     A.TApp t args -> do
       ct <- go t
       cargs <- mapM go args
       return $ foldl L.App ct cargs
-    A.TLam tt -> inBoundVar $ 
-      L.Lam L.Anon <$> go tt 
+    A.TLam tt -> inBoundVar $
+      L.Lam L.Anon <$> go tt
     A.TLit l -> return $ L.Const (show l) -- FIXME: How are literals (eg. the numeral 10) represented in λ□?
     A.TCon qn -> return $ L.Ctor (L.Inductive $ A.prettyShow qn) 99 -- FIXME
     A.TLet tt tu -> L.Let L.Anon <$> go tt <*> (go tu) -- FIXME: name
@@ -62,4 +61,4 @@ instance A.CaseType ~> L.Inductive where
   go = \case
     A.CTData qn -> return $ L.Inductive (A.prettyShow qn)
     A.CTNat -> return $ L.Inductive "Nat"
-    _ -> fail "" 
+    _ -> fail ""

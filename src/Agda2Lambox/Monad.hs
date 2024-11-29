@@ -29,6 +29,6 @@ inDefName :: QName -> C a -> (Int -> C a) -> C a
 inDefName name m f = do
   defName <- currentDef <$> ask
   if name == defName then
-    ask >>= \e -> f (boundVars e) 
+    ask >>= \e -> f (boundVars e)
   else
     m

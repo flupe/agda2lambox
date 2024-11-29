@@ -102,7 +102,7 @@ import Agda.TypeChecking.Monad
   , getContext, addContext
   , reportSLn, VerboseLevel
   , Definition(..), Defn(..)
-  , pattern Function, funProjection, funClauses, funWith, funExtLam, funMutual 
+  , pattern Function, funProjection, funClauses, funWith, funExtLam, funMutual
   , funInline, funCompiled
   , Projection(..), droppedPars
   , pattern Datatype, dataCons, dataPars
