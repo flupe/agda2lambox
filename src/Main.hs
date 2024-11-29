@@ -12,11 +12,12 @@ import Data.Version ( showVersion )
 import Paths_agda2lambox ( version )
 
 import Agda.Lib
-import Agda.Utils (pp)
+import Agda.Utils (pp, unqual)
 
 import qualified LambdaBox as L
 import Agda2Lambox.Convert ( convert )
 import Agda2Lambox.Monad ( runC0 )
+import Lambox2Coq
 
 main = runAgda [Backend backend]
 
@@ -41,8 +42,13 @@ data CompiledDef' = CompiledDef
 
 instance Show CompiledDef' where
   show CompiledDef{..} =
-    unlines [ prettyShow (qnameName name) <> " = " <> prettyShow tterm
-            , prettyShow (qnameName name) <> " = " <> show lterm ]
+    unlines [ "-- Treeless"
+            , prettyShow (qnameName name) <> " = " <> prettyShow tterm
+            , "-- Haskell LambdaBox"
+            , prettyShow (qnameName name) <> " = " <> show lterm
+            , "-- Coq LambdaBox"
+            , term2Coq lterm
+            ]
 
 type CompiledDef = Maybe CompiledDef'
 
@@ -86,16 +92,37 @@ compile opts tlm _ Defn{..}
         case ds of
           []  -> return $ Just $ CompiledDef defName tterm tm
           [x] -> return $ Just $ CompiledDef defName tterm tm'
-          _ -> error "No mutual functons supported yet" 
+          _ -> error "No mutual functons supported yet"
 
+coqModuleTemplate :: [(String, String)] -> String
+coqModuleTemplate coqterms = unlines $
+  [ "From Coq Require Import Extraction."
+  , "From RustExtraction Require Import Loader."
+  , "From MetaCoq.Erasure.Typed Require Import ExAst."
+  , "From MetaCoq.Common Require Import BasicAst."
+  , "From Coq Require Import Arith."
+  , "From Coq Require Import Bool."
+  , "From Coq Require Import List."
+  , "From Coq Require Import Program."
+  , ""
+  ] ++ map (uncurry coqDefTemplate) coqterms ++
+  [ "From RustExtraction Require Import ExtrRustBasic."
+  , "From RustExtraction Require Import ExtrRustUncheckedArith."
+  ] ++ map (coqExtractTemplate "dummy" . fst) coqterms
+
+coqDefTemplate :: String -> String -> String
+coqDefTemplate n d =  "Definition " <> n <> " : term := " <> d <> ".\n"
+
+coqExtractTemplate :: FilePath -> String -> String
+coqExtractTemplate fp n = "Redirect \"./" <> n <> ".rs\" Rust Extract " <> n <> "."
 
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
             -> [CompiledDef]
             -> TCM ModuleRes
 writeModule opts _ _ m (catMaybes -> cdefs) = do
   outDir <- compileDir
-  liftIO $ putStrLn (moduleNameToFileName m "txt")
-  let outFile = fromMaybe outDir (optOutDir opts) <> "/" <> moduleNameToFileName m "txt"
+  liftIO $ putStrLn (moduleNameToFileName m "v")
+  let outFile = fromMaybe outDir (optOutDir opts) <> "/" <> moduleNameToFileName m ".v"
   unless (null cdefs) $ liftIO
     $ writeFile outFile
-    $ "*** module " <> prettyShow m <> " ***\n" <> unlines (show <$> cdefs)
+    $ coqModuleTemplate (map (\cdef -> ((unqual $ name cdef), term2Coq (lterm cdef))) cdefs)

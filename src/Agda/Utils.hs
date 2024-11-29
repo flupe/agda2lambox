@@ -53,6 +53,9 @@ reportCurrentCtx = do
   ctx <- currentCtx
   report $ " currentCtx: " <> pp ctx
 
+unqual :: QName -> String
+unqual = pp . last . qnameToList0
+
 {-
 lookupCtx :: MonadTCEnv m => Int -> m (String, Type)
 lookupCtx i = first transcribe . (!! i) {-. reverse-} <$> currentCtx
@@ -71,8 +74,6 @@ lookupCtxTy i = (!! i) {-. reverse-} <$> currentCtxTys
 
 -- ** variables
 
-unqual :: QName -> String
-unqual = transcribe . pp . qnameName
 
 qParent :: QName -> QName
 qParent =

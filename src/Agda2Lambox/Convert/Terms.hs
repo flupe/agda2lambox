@@ -23,7 +23,7 @@ fixme = L.Named "FIXME"
 instance A.TTerm ~> L.Term where
   go = \case
     A.TVar n -> return $ L.BVar n -- Can variables be erased?
-    A.TPrim tp -> return $ L.Const (show tp) -- FIXME
+    A.TPrim tp -> go tp
     A.TDef qn ->
       inDefName qn
         (return $ L.FVar (A.prettyShow qn))
@@ -61,4 +61,10 @@ instance A.CaseType ~> L.Inductive where
   go = \case
     A.CTData qn -> return $ L.Inductive (A.prettyShow qn)
     A.CTNat -> return $ L.Inductive "Nat"
+    _ -> fail ""
+
+instance A.TPrim ~> L.Term where
+  go = \case
+    A.PAdd -> return $ L.Const "Nat.add"
+    A.PMul -> return $ L.Const "Nat.mult"
     _ -> fail ""
