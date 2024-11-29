@@ -5,8 +5,6 @@ import Control.Monad.State ( StateT, runStateT )
 
 import Agda ( TCM , QName)
 
-
-
 -- | TCM monad extended with a custom environment and state.
 type C = ReaderT Env TCM
 
@@ -15,7 +13,7 @@ runC0 defName m = runReaderT m (initEnv defName)
 
 data Env = Env
   { currentDef :: QName
-  , boundVars :: Int
+  , boundVars  :: Int
   }
 
 initEnv :: QName -> Env

@@ -102,7 +102,8 @@ import Agda.TypeChecking.Monad
   , getContext, addContext
   , reportSLn, VerboseLevel
   , Definition(..), Defn(..)
-  , pattern Function, funProjection, funClauses, funWith, funExtLam, funMutual
+  , pattern Function
+  , funProjection, funClauses, funWith, funExtLam, funMutual, funErasure
   , funInline, funCompiled
   , Projection(..), droppedPars
   , pattern Datatype, dataCons, dataPars
@@ -157,7 +158,7 @@ import Text.Show.Pretty
 
 -- * Agda utilities
 import Agda.Utils.Monad
-  ( ifM, mapMaybeM, partitionM, ifM, whenM, concatMapM )
+  ( ifM, ifNotM, mapMaybeM, partitionM, whenM, concatMapM )
 import Agda.Utils.Maybe
   ( ifJustM, boolToMaybe )
 import Agda.Utils.List

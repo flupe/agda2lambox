@@ -1,7 +1,6 @@
-{-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import Data.Maybe ( fromMaybe, catMaybes )
+import Data.Maybe ( fromMaybe, catMaybes, isJust )
 import Control.Monad ( unless )
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Control.DeepSeq ( NFData(..) )
@@ -52,7 +51,6 @@ instance Show CompiledDef' where
 
 type CompiledDef = Maybe CompiledDef'
 
-
 backend :: Backend' Options Options ModuleEnv ModuleRes CompiledDef
 backend = Backend'
   { backendName           = "agda2lambox"
@@ -79,42 +77,33 @@ moduleSetup _ _ m _ = do
   return $ Recompile ()
 
 compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM CompiledDef
-compile opts tlm _ Defn{..}
-  = withCurrentModule (qnameModule defName)
-  $ getUniqueCompilerPragma "AGDA2LAMBOX" defName >>= \case
-      Nothing -> return Nothing
-      Just (CompilerPragma _ _) -> do
-        Just tterm <- toTreeless EagerEvaluation defName
-        tm <- runC0 defName (convert tterm)
-        let tm' = L.Fix [L.Def (L.Named $ pp defName) tm 0] 0
-        Function{..} <- return theDef
-        Just ds <- return funMutual
-        case ds of
-          []  -> return $ Just $ CompiledDef defName tterm tm
-          [x] -> return $ Just $ CompiledDef defName tterm tm'
-          _ -> error "No mutual functons supported yet"
-
-coqModuleTemplate :: [(String, String)] -> String
-coqModuleTemplate coqterms = unlines $
-  [ "From Coq Require Import Extraction."
-  , "From RustExtraction Require Import Loader."
-  , "From MetaCoq.Erasure.Typed Require Import ExAst."
-  , "From MetaCoq.Common Require Import BasicAst."
-  , "From Coq Require Import Arith."
-  , "From Coq Require Import Bool."
-  , "From Coq Require Import List."
-  , "From Coq Require Import Program."
-  , ""
-  ] ++ map (uncurry coqDefTemplate) coqterms ++
-  [ "From RustExtraction Require Import ExtrRustBasic."
-  , "From RustExtraction Require Import ExtrRustUncheckedArith."
-  ] ++ map (coqExtractTemplate "dummy" . fst) coqterms
-
-coqDefTemplate :: String -> String -> String
-coqDefTemplate n d =  "Definition " <> n <> " : term := " <> d <> ".\n"
-
-coqExtractTemplate :: FilePath -> String -> String
-coqExtractTemplate fp n = "Redirect \"./" <> n <> ".rs\" Rust Extract " <> n <> "."
+compile opts tlm _ defn@Defn{..} =
+  withCurrentModule (qnameModule defName) $
+    if ignoreDef defn then return Nothing else do
+    Just tterm <- toTreeless EagerEvaluation defName
+    Function{..} <- return theDef
+    Just ds <- return funMutual
+    tm <- runC0 defName (convert tterm)
+    let fix | [] <- ds
+            = id
+            | [d] <- ds
+            = \tm -> L.Fix [L.Def (L.Named $ pp defName) tm 0] 0
+            | otherwise
+            = error "No mutual functons supported yet"
+    return $ Just $ CompiledDef defName tterm (fix tm)
+  where
+  -- | Which Agda definitions to actually compile?
+  ignoreDef :: Definition -> Bool
+  ignoreDef d@Defn{..}
+    | hasQuantity0 d
+    = True
+    | Function {..} <- theDef
+    = (theDef ^. funInline) -- inlined functions (from module application)
+    -- || funErasure           -- @0 functions
+    || isJust funExtLam     -- pattern-lambdas
+    || isJust funWith       -- with-generated
+    | otherwise
+    = True
 
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
             -> [CompiledDef]
@@ -125,4 +114,29 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
   let outFile = fromMaybe outDir (optOutDir opts) <> "/" <> moduleNameToFileName m ".v"
   unless (null cdefs) $ liftIO
     $ writeFile outFile
-    $ coqModuleTemplate (map (\cdef -> ((unqual $ name cdef), term2Coq (lterm cdef))) cdefs)
+    $ coqModuleTemplate
+    $ map (\cdef -> (unqual (name cdef), term2Coq (lterm cdef))) cdefs
+  where
+  coqModuleTemplate :: [(String, String)] -> String
+  coqModuleTemplate coqterms = unlines $
+    [ "From Coq Require Import Extraction."
+    , "From RustExtraction Require Import Loader."
+    , "From MetaCoq.Erasure.Typed Require Import ExAst."
+    , "From MetaCoq.Common Require Import BasicAst."
+    , "From Coq Require Import Arith."
+    , "From Coq Require Import Bool."
+    , "From Coq Require Import List."
+    , "From Coq Require Import Program."
+    , ""
+    ] ++ map (uncurry coqDefTemplate) coqterms ++
+    [ "From RustExtraction Require Import ExtrRustBasic."
+    , "From RustExtraction Require Import ExtrRustUncheckedArith."
+    ] ++ map (coqExtractTemplate "dummy" . fst) coqterms
+
+  coqDefTemplate :: String -> String -> String
+  coqDefTemplate n d =  "Definition " <> n <> " : term := " <> d <> ".\n"
+
+  coqExtractTemplate :: FilePath -> String -> String
+  coqExtractTemplate fp n = "Redirect \"./" <> n <> ".rs\" Rust Extract " <> n <> "."
+
+

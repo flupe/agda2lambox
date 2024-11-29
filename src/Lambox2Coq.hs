@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, InstanceSigs #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Lambox2Coq where
 
 import Data.Bifunctor(bimap)
@@ -52,13 +52,10 @@ term2Coq =  \case
     list ss = "[" <> intercalate "; " ss <> "]"
 
 instance Name ~> Coq where
-  go :: Name :~> Coq
   go = pure . name2Coq
 
 instance Def ~> Coq where
-  go :: Def :~> Coq
   go = pure . def2Coq
 
 instance Term ~> Coq where
-  go :: Term :~> Coq
   go = pure . term2Coq
