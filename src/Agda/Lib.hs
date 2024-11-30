@@ -116,7 +116,7 @@ import Agda.TypeChecking.Monad
 import Agda.TypeChecking.Free
   ( freeVars, VarCounts(..) )
 import Agda.TypeChecking.Datatypes
-  ( getConstructorData, getConHead )
+  ( getConstructorData, getConstructors, getConHead )
 import Agda.TypeChecking.Records
   ( isRecord, isRecordConstructor, isRecordType )
 import Agda.TypeChecking.Level

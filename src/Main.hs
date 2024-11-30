@@ -15,7 +15,7 @@ import Agda.Utils (pp, unqual)
 
 import qualified LambdaBox as L
 import Agda2Lambox.Convert ( convert )
-import Agda2Lambox.Monad ( runC0 )
+import Agda2Lambox.Monad ( runC0, inMutuals )
 import Lambox2Coq
 
 main = runAgda [Backend backend]
@@ -34,19 +34,16 @@ defaultOptions = Options{ optOutDir = Nothing }
 type ModuleEnv   = ()
 type ModuleRes   = ()
 data CompiledDef' = CompiledDef
-  { name :: QName
+  { name  :: QName
   , tterm :: TTerm
   , lterm :: L.Term
   }
 
 instance Show CompiledDef' where
-  show CompiledDef{..} =
-    unlines [ "-- Treeless"
-            , prettyShow (qnameName name) <> " = " <> prettyShow tterm
-            , "-- Haskell LambdaBox"
-            , prettyShow (qnameName name) <> " = " <> show lterm
-            , "-- Coq LambdaBox"
-            , term2Coq lterm
+  show CompiledDef{..} = let pre = pp (qnameName name) <> " = " in
+    unlines [ pre <> pp tterm
+            , pre <> pp lterm
+            -- , pre <> term2Coq lterm
             ]
 
 type CompiledDef = Maybe CompiledDef'
@@ -83,14 +80,11 @@ compile opts tlm _ defn@Defn{..} =
     Just tterm <- toTreeless EagerEvaluation defName
     Function{..} <- return theDef
     Just ds <- return funMutual
-    tm <- runC0 defName (convert tterm)
-    let fix | [] <- ds
-            = id
-            | [d] <- ds
-            = \tm -> L.Fix [L.Def (L.Named $ pp defName) tm 0] 0
-            | otherwise
-            = error "No mutual functons supported yet"
-    return $ Just $ CompiledDef defName tterm (fix tm)
+    tm <- runC0 (inMutuals ds $ convert tterm)
+    let tm' = case ds of []    -> tm
+                         [d]   -> L.Fix [L.Def (L.Named $ pp defName) tm 0] 0
+                         _:_:_ -> error "Mutual recursion not supported."
+    return $ Just $ CompiledDef defName tterm tm'
   where
   -- | Which Agda definitions to actually compile?
   ignoreDef :: Definition -> Bool
@@ -111,6 +105,10 @@ writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
 writeModule opts _ _ m (catMaybes -> cdefs) = do
   outDir <- compileDir
   liftIO $ putStrLn (moduleNameToFileName m "v")
+  let outFile = fromMaybe outDir (optOutDir opts) <> "/" <> moduleNameToFileName m ".txt"
+  unless (null cdefs) $ liftIO
+    $ writeFile outFile
+    $ unlines (show <$> cdefs)
   let outFile = fromMaybe outDir (optOutDir opts) <> "/" <> moduleNameToFileName m ".v"
   unless (null cdefs) $ liftIO
     $ writeFile outFile
@@ -138,5 +136,3 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
 
   coqExtractTemplate :: FilePath -> String -> String
   coqExtractTemplate fp n = "Redirect \"./" <> n <> ".rs\" Rust Extract " <> n <> "."
-
-

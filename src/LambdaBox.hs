@@ -1,5 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
 module LambdaBox where
-import GHC.Stack.CCS (whereFrom)
+
+-- import qualified Agda as A
+import Agda.Syntax.Common.Pretty
 
 type Ident = String
 type KName = String
@@ -14,6 +17,10 @@ data Name = Anon | Named Ident
 
 data Def = Def Name Term Int
   deriving (Eq, Show)
+
+instance Pretty Def where
+  -- prettyPrec _ (Def s _ _) = pretty s
+  prettyPrec _ (Def _ t _) = pretty t
 
 -- Taken from:
 -- https://github.com/MetaCoq/metacoq/blob/coq-8.20/erasure/theories/Typed/ExAst.v
@@ -42,3 +49,47 @@ data Term
   | Case Inductive Int Term [(Int, Term)]
   | Fix [Def] Int
   deriving (Eq, Show)
+
+instance Pretty Term where
+  prettyPrec p v =
+    case v of
+      Box ->
+        text "⫿"
+      BVar x ->
+        text ("@" ++ show x)
+      FVar s ->
+        text s
+      Lam s t ->
+        mparens (p > 0) $
+        sep [ "λ" <+> pretty s <+> "->"
+            , nest 2 (pretty t) ]
+      Let x e t ->
+        mparens (p > 0) $
+        sep [ "let" <+> sep [ pretty x <+> "="
+                            , nest 2 (pretty e) ]
+            , pretty t ]
+      App t t' ->
+        mparens (p > 9) $
+        sep [ pretty t
+            , nest 2 $ prettyPrec 10 t' ]
+      Const s ->
+        mparens (p > 0) $
+        text s
+      Ctor ind i ->
+        pretty ind <> "#" <> pretty i
+      Case ind n t bs ->
+        mparens (p > 0) $
+        sep [ ("case<" <> pretty ind <> "," <> pretty n <> ">") <+> pretty t <+> "of"
+            , nest 2 $ vcat (map (\(n, e) -> sep ["λ<" <> pretty n <> ">", nest 2 (pretty e)]) bs) ]
+      Fix ds i -> -- FIXME: for mutual recursion
+        mparens (p > 0) $
+        sep [ "μ rec ->"
+            , nest 2 (pretty $ ds !! i) ]
+
+instance Pretty Inductive where
+  prettyPrec _ (Inductive s) = text s
+
+instance Pretty Name where
+  prettyPrec _ = \case
+    Anon -> text "_"
+    Named s -> text s

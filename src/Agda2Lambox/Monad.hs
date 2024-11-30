@@ -1,6 +1,6 @@
 module Agda2Lambox.Monad where
 
-import Control.Monad.Reader ( ReaderT(runReaderT) , local , ask  )
+import Control.Monad.Reader ( ReaderT(runReaderT), local )
 import Control.Monad.State ( StateT, runStateT )
 
 import Agda ( TCM , QName)
@@ -8,25 +8,27 @@ import Agda ( TCM , QName)
 -- | TCM monad extended with a custom environment and state.
 type C = ReaderT Env TCM
 
-runC0 :: QName -> C a -> TCM a
-runC0 defName m = runReaderT m (initEnv defName)
+runC0 :: C a -> TCM a
+runC0 m = runReaderT m initEnv
 
 data Env = Env
-  { currentDef :: QName
-  , boundVars  :: Int
+  { mutuals   :: [QName]
+  , boundVars :: Int
   }
 
-initEnv :: QName -> Env
-initEnv defName = Env defName 0
+initEnv :: Env
+initEnv = Env
+  { mutuals   = []
+  , boundVars = 0
+  }
+
+inMutuals :: [QName] -> C a -> C a
+inMutuals ds = local $ \e -> e
+  { mutuals = reverse ds }
+
+inBoundVars :: Int -> C a -> C a
+inBoundVars n = local $ \e -> e
+  { boundVars = boundVars e + n }
 
 inBoundVar :: C a -> C a
-inBoundVar = local $ \ e -> e
-  { boundVars = boundVars e + 1 }
-
-inDefName :: QName -> C a -> (Int -> C a) -> C a
-inDefName name m f = do
-  defName <- currentDef <$> ask
-  if name == defName then
-    ask >>= \e -> f (boundVars e)
-  else
-    m
+inBoundVar = inBoundVars 1
