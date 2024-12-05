@@ -13,5 +13,5 @@ import Agda2Lambox.Convert.Class
 -- import Agda2Lambox.Convert.Literals
 -- import Agda2Lambox.Convert.Builtins
 import Agda2Lambox.Convert.Terms
--- import Agda2Lambox.Convert.Types
+import Agda2Lambox.Convert.Types
 -- import Agda2Lambox.Convert.Definitions

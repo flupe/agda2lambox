@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings , LambdaCase #-}
 module LambdaBox where
 
 -- import qualified Agda as A
@@ -36,6 +36,26 @@ data Type
   | TInd Inductive
   | TConst KName
   deriving (Eq , Show)
+
+instance Pretty Type where
+  prettyPrec p v =
+    case v of
+      TBox ->
+        text "□"
+      TAny ->
+        text "⁇"
+      TArr s t ->
+        mparens (p > 0) $
+          prettyPrec 1 s <+> "->" <+> pretty t
+      TApp s t ->
+        mparens (p > 9) $ pretty s <+> prettyPrec 10 t
+      TVar n ->
+        text ("@" <> show n)
+      TInd ind ->
+        mparens (p > 0) $
+          "<" <> pretty ind <> ">"
+      TConst kname ->
+        text kname
 
 data Term
   = Box

@@ -36,13 +36,21 @@ type ModuleRes   = ()
 data CompiledDef' = CompiledDef
   { name  :: QName
   , tterm :: TTerm
+  , atype :: Type 
+  , ltype :: L.Type 
   , lterm :: L.Term
   }
 
 instance Show CompiledDef' where
-  show CompiledDef{..} = let pre = pp (qnameName name) <> " = " in
-    unlines [ pre <> pp tterm
-            , pre <> pp lterm
+  show CompiledDef{..} =
+    let pre  = pp (qnameName name) <> " = " in
+    let preT = pp (qnameName name) <> " : " in  
+    unlines [ "=== SOURCE ==="
+            , preT <> pp atype  
+            , pre  <> pp tterm
+            , "=== COMPILED ==="
+            , preT <> pp ltype
+            , pre  <> pp lterm
             -- , pre <> term2Coq lterm
             ]
 
@@ -81,10 +89,11 @@ compile opts tlm _ defn@Defn{..} =
     Function{..} <- return theDef
     Just ds <- return funMutual
     tm <- runC0 (inMutuals ds $ convert tterm)
+    ty <- runC0 (convert (unEl $ defType)) 
     let tm' = case ds of []    -> tm
                          [d]   -> L.Fix [L.Def (L.Named $ pp defName) tm 0] 0
                          _:_:_ -> error "Mutual recursion not supported."
-    return $ Just $ CompiledDef defName tterm tm'
+    return $ Just $ CompiledDef defName tterm defType ty tm'
   where
   -- | Which Agda definitions to actually compile?
   ignoreDef :: Definition -> Bool
