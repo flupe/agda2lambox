@@ -9,6 +9,8 @@ import Data.Maybe ( fromMaybe, catMaybes, isJust )
 import Data.Version ( showVersion )
 import GHC.Generics ( Generic )
 import System.Console.GetOpt ( OptDescr(Option), ArgDescr(ReqArg) )
+import System.Directory ( createDirectoryIfMissing )
+import System.FilePath ( (</>) )
 
 import Paths_agda2lambox ( version )
 
@@ -118,17 +120,23 @@ writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
             -> [Maybe CompiledDef]
             -> TCM ModuleRes
 writeModule opts _ _ m (catMaybes -> cdefs) = do
-  outDir <- compileDir
-  liftIO $ putStrLn (moduleNameToFileName m "v")
-  let outFile = fromMaybe outDir (optOutDir opts) <> "/" <> moduleNameToFileName m ".txt"
-  unless (null cdefs) $ liftIO
-    $ writeFile outFile
-    $ unlines (show <$> cdefs)
-  let outFile = fromMaybe outDir (optOutDir opts) <> "/" <> moduleNameToFileName m ".v"
-  unless (null cdefs) $ liftIO
-    $ writeFile outFile
-    $ coqModuleTemplate
-    $ map (\cdef -> (unqual (name cdef), term2Coq (lterm cdef))) cdefs
+  compDir <- compileDir
+
+  let outDir   = fromMaybe compDir (optOutDir opts)
+      fileName = (outDir </>) . moduleNameToFileName m
+
+  liftIO $ createDirectoryIfMissing True outDir
+
+  unless (null cdefs) $ liftIO do
+    putStrLn $ "Writing " <> fileName ".v"
+
+    writeFile (fileName ".txt")
+      $ unlines (show <$> cdefs)
+
+    writeFile (fileName ".v")
+      $ coqModuleTemplate
+      $ map (\cdef -> (unqual (name cdef), term2Coq (lterm cdef))) cdefs
+
   where
   coqModuleTemplate :: [(String, String)] -> String
   coqModuleTemplate coqterms = unlines $
