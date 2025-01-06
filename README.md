@@ -5,6 +5,7 @@
 
 ## References
 
+- [Pierre Letouzey's thesis introducing LamndaBox](https://www.irif.fr/~letouzey/download/these_letouzey.pdf) (in French)
 - [Verified Extraction from Coq to OCaml](https://github.com/yforster/coq-verified-extraction/)
   and its [accompanying paper](https://dl.acm.org/doi/10.1145/3656379)
 - [Certified Erasure for Coq, in Coq](https://inria.hal.science/hal-04077552)
