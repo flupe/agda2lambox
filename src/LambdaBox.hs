@@ -6,6 +6,7 @@ import Agda.Syntax.Common.Pretty
 
 type Ident = String
 type KName = String
+
 newtype Inductive = Inductive String
   deriving (Eq)
 
@@ -58,27 +59,30 @@ instance Pretty Type where
         text kname
 
 data Term
-  = Box
-  | BVar Int
-  | FVar Ident
-  | Lam Name Term
-  | Let Name Term Term
-  | App Term Term
-  | Const KName
-  | Ctor Inductive Int
+  = Box                 -- ^ Proofs and erased terms
+  | BVar Int            -- ^ Bound variable, with de Bruijn index
+  | FVar Ident          -- ^ Free variable with identifier
+  | Lam Name Term       -- ^ Lambda abstraction
+  | Let Name Term Term  
+      -- ^ Let bindings.
+      --   Unused in the backend, since Agda itself no longer has let bindings
+      --   in the concrete syntac.
+  | App Term Term       -- ^ Term application
+  | Const KName         -- ^ Named constant.
+  | Ctor Inductive Int  -- ^ Inductive constructor.
   | Case Inductive Int Term [(Int, Term)]
+      -- ^ Pattern-matching case construct.
   | Fix [Def] Int
+     -- ^ Fixpoint combinator.
+     -- NOTE(flupe): Why no terms?
   deriving (Eq, Show)
 
 instance Pretty Term where
   prettyPrec p v =
     case v of
-      Box ->
-        text "⫿"
-      BVar x ->
-        text ("@" ++ show x)
-      FVar s ->
-        text s
+      Box    -> text "⫿"
+      BVar x -> text $ "@" ++ show x
+      FVar s -> text s
       Lam s t ->
         mparens (p > 0) $
         sep [ "λ" <+> pretty s <+> "->"

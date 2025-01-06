@@ -1,13 +1,15 @@
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+
 module Main where
 
-import Data.Maybe ( fromMaybe, catMaybes, isJust )
 import Control.Monad ( unless )
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Control.DeepSeq ( NFData(..) )
-
+import Data.Maybe ( fromMaybe, catMaybes, isJust )
+import Data.Version ( showVersion )
+import GHC.Generics ( Generic )
 import System.Console.GetOpt ( OptDescr(Option), ArgDescr(ReqArg) )
 
-import Data.Version ( showVersion )
 import Paths_agda2lambox ( version )
 
 import Agda.Lib
@@ -18,22 +20,27 @@ import Agda2Lambox.Convert ( convert )
 import Agda2Lambox.Monad ( runC0, inMutuals )
 import Lambox2Coq
 
+
+main :: IO ()
 main = runAgda [Backend backend]
 
+
+-- | LambdaBox backend options.
 data Options = Options { optOutDir :: Maybe FilePath }
+  deriving (Generic, NFData)
 
-instance NFData Options where
-  rnf _ = ()
-
+-- | Setter for backend output directory option.
 outdirOpt :: Monad m => FilePath -> Options -> m Options
-outdirOpt dir opts = return opts{ optOutDir = Just dir }
+outdirOpt dir opts = return opts { optOutDir = Just dir }
 
 defaultOptions :: Options
-defaultOptions = Options{ optOutDir = Nothing }
+defaultOptions = Options { optOutDir = Nothing }
 
-type ModuleEnv   = ()
-type ModuleRes   = ()
-data CompiledDef' = CompiledDef
+
+type ModuleEnv = ()
+type ModuleRes = ()
+
+data CompiledDef = CompiledDef
   { name  :: QName
   , tterm :: TTerm
   , atype :: Type 
@@ -41,7 +48,7 @@ data CompiledDef' = CompiledDef
   , lterm :: L.Term
   }
 
-instance Show CompiledDef' where
+instance Show CompiledDef where
   show CompiledDef{..} =
     let pre  = pp (qnameName name) <> " = " in
     let preT = pp (qnameName name) <> " : " in  
@@ -54,9 +61,7 @@ instance Show CompiledDef' where
             -- , pre <> term2Coq lterm
             ]
 
-type CompiledDef = Maybe CompiledDef'
-
-backend :: Backend' Options Options ModuleEnv ModuleRes CompiledDef
+backend :: Backend' Options Options ModuleEnv ModuleRes (Maybe CompiledDef)
 backend = Backend'
   { backendName           = "agda2lambox"
   , backendVersion        = Just (showVersion version)
@@ -75,41 +80,42 @@ backend = Backend'
   , mayEraseType          = \ _ -> return True
   }
 
+
 moduleSetup :: Options -> IsMain -> TopLevelModuleName -> Maybe FilePath
             -> TCM (Recompile ModuleEnv ModuleRes)
 moduleSetup _ _ m _ = do
   setScope . iInsideScope =<< curIF
   return $ Recompile ()
 
-compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM CompiledDef
+-- | Which Agda definitions to ignore.
+ignoreDef :: Definition -> Bool
+ignoreDef d@Defn{..}
+  | hasQuantity0 d
+  = True
+  | Function {..} <- theDef
+  = (theDef ^. funInline) -- inlined functions (from module application)
+  -- || funErasure           -- @0 functions
+  || isJust funExtLam     -- pattern-lambdas
+  || isJust funWith       -- with-generated
+  | otherwise
+  = True
+
+compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM (Maybe CompiledDef)
+compile _ _ _ defn | ignoreDef defn = return Nothing
 compile opts tlm _ defn@Defn{..} =
-  withCurrentModule (qnameModule defName) $
-    if ignoreDef defn then return Nothing else do
+  withCurrentModule (qnameModule defName) do
     Just tterm <- toTreeless EagerEvaluation defName
-    Function{..} <- return theDef
-    Just ds <- return funMutual
+    let Function{..} = theDef
+        Just ds      = funMutual
     tm <- runC0 (inMutuals ds $ convert tterm)
     ty <- runC0 (convert (unEl $ defType)) 
     let tm' = case ds of []    -> tm
                          [d]   -> L.Fix [L.Def (L.Named $ pp defName) tm 0] 0
                          _:_:_ -> error "Mutual recursion not supported."
     return $ Just $ CompiledDef defName tterm defType ty tm'
-  where
-  -- | Which Agda definitions to actually compile?
-  ignoreDef :: Definition -> Bool
-  ignoreDef d@Defn{..}
-    | hasQuantity0 d
-    = True
-    | Function {..} <- theDef
-    = (theDef ^. funInline) -- inlined functions (from module application)
-    -- || funErasure           -- @0 functions
-    || isJust funExtLam     -- pattern-lambdas
-    || isJust funWith       -- with-generated
-    | otherwise
-    = True
 
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
-            -> [CompiledDef]
+            -> [Maybe CompiledDef]
             -> TCM ModuleRes
 writeModule opts _ _ m (catMaybes -> cdefs) = do
   outDir <- compileDir
