@@ -43,21 +43,21 @@ def2Coq (Def name term rarg) =
 
 term2Coq :: Term -> Coq
 term2Coq =  \case
-  Box -> ctor "tBox" []
-  BVar n -> ctor "tRel" [show n] -- TODO: Not sure if tRel is the right constructor
-  FVar i -> ctor "tVar" [show i]
-  Lam na e -> ctor "tLambda" [name2Coq na, term2Coq e]
-  Let na b e -> ctor "tLetIn" [name2Coq na, term2Coq b, term2Coq e]
-  App f e -> ctor "tApp" [term2Coq f, term2Coq e]
-  Const k -> ctor "tConst" [show k]
-  Ctor ind idx -> ctor "tConstruct" [show ind, show idx]
+  Box              -> ctor "tBox" []
+  Rel n            -> ctor "tRel" [show n] -- TODO: Not sure if tRel is the right constructor
+  Var i            -> ctor "tVar" [show i]
+  Lam na e         -> ctor "tLambda" [name2Coq na, term2Coq e]
+  Let na b e       -> ctor "tLetIn" [name2Coq na, term2Coq b, term2Coq e]
+  App f e          -> ctor "tApp" [term2Coq f, term2Coq e]
+  Const k          -> ctor "tConst" [show k]
+  Ctor ind idx     -> ctor "tConstruct" [show ind, show idx]
+  Fix defs idx     -> ctor "tFix" [list $ def2Coq <$> defs, show idx]
   Case ind n c brs ->
     ctor "tCase"
     [ pair (show ind) (show n)
     , term2Coq c
     , list $ uncurry pair . bimap show term2Coq <$> brs -- TODO: `brs` has a different type in MetaCoq
     ]
-  Fix defs idx -> ctor "tFix" [list $ def2Coq <$> defs, show idx]
 
 instance Name ~> Coq where
   go = pure . name2Coq

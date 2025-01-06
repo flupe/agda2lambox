@@ -58,11 +58,12 @@ instance Pretty Type where
       TConst kname ->
         text kname
 
+
 data Term
-  = Box                 -- ^ Proofs and erased terms
-  | BVar Int            -- ^ Bound variable, with de Bruijn index
-  | FVar Ident          -- ^ Free variable with identifier
-  | Lam Name Term       -- ^ Lambda abstraction
+  = Box             -- ^ Proofs and erased terms
+  | Rel Int         -- ^ Bound variable, with de Bruijn index
+  | Var Ident       -- ^ Free variable with identifier
+  | Lam Name Term   -- ^ Lambda abstraction
   | Let Name Term Term  
       -- ^ Let bindings.
       --   Unused in the backend, since Agda itself no longer has let bindings
@@ -77,12 +78,13 @@ data Term
      -- NOTE(flupe): Why no terms?
   deriving (Eq, Show)
 
+
 instance Pretty Term where
   prettyPrec p v =
     case v of
       Box    -> text "⫿"
-      BVar x -> text $ "@" ++ show x
-      FVar s -> text s
+      Rel x -> text $ "@" ++ show x
+      Var s -> text s
       Lam s t ->
         mparens (p > 0) $
         sep [ "λ" <+> pretty s <+> "->"
@@ -109,6 +111,7 @@ instance Pretty Term where
         mparens (p > 0) $
         sep [ "μ rec ->"
             , nest 2 (pretty $ ds !! i) ]
+
 
 instance Pretty Inductive where
   prettyPrec _ (Inductive s) = text s

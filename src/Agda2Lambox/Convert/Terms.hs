@@ -25,13 +25,13 @@ fixme = L.Named "FIXME"
 -- | Compiling (treeless) Agda terms into Lambox expressions.
 instance A.TTerm ~> L.Term where
   go = \case
-    A.TVar n -> return $ L.BVar n -- Can variables be erased?
+    A.TVar n -> return $ L.Rel n -- Can variables be erased?
     A.TPrim tp -> go tp
     A.TDef qn -> do
       Env{..} <- ask
       case qn `elemIndex` mutuals of
-        Nothing -> return $ L.FVar (unqual qn)
-        Just i  -> return $ L.BVar (i + boundVars)
+        Nothing -> return $ L.Var (unqual qn)
+        Just i  -> return $ L.Rel (i + boundVars)
     A.TApp t args -> do
       ct <- go t
       cargs <- mapM go args
@@ -51,7 +51,7 @@ instance A.TTerm ~> L.Term where
         A.NotErased _ -> do
           calts <- traverse go talts
           cind <- go caseType
-          return $ L.Case cind 0 (L.BVar n) calts
+          return $ L.Case cind 0 (L.Rel n) calts
     A.TUnit -> return L.Box
     A.TSort -> return L.Box
     A.TErased -> return L.Box
