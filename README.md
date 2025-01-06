@@ -3,6 +3,13 @@
 - The backend is defined in `src/Main.hs`.
 - The `test/` directory contains an example compilation of `Test.agda` to `Test.txt`.
 
+## TODO
+
+- [ ] Setup compilation to WASM/RUST
+- [ ] Setup proper testing infrastructure
+- [ ] Support mutual definitions
+- [ ] Support literals (ints and floats)
+
 ## References
 
 - [Pierre Letouzey's thesis introducing LamndaBox](https://www.irif.fr/~letouzey/download/these_letouzey.pdf) (in French)
