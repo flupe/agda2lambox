@@ -141,18 +141,22 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
   coqModuleTemplate :: [(String, String)] -> String
   coqModuleTemplate coqterms = unlines $
     [ "From Coq Require Import Extraction."
-    , "From RustExtraction Require Import Loader."
     , "From MetaCoq.Erasure.Typed Require Import ExAst."
-    , "From MetaCoq.Common Require Import BasicAst."
+    , "From MetaCoq.Common Require Import BasicAst Kernames."
+    , "From MetaCoq.Utils Require Import bytestring MCString."
     , "From Coq Require Import Arith."
     , "From Coq Require Import Bool."
     , "From Coq Require Import List."
     , "From Coq Require Import Program."
     , ""
-    ] ++ map (uncurry coqDefTemplate) coqterms ++
-    [ "From RustExtraction Require Import ExtrRustBasic."
-    , "From RustExtraction Require Import ExtrRustUncheckedArith."
-    ] ++ map (coqExtractTemplate "dummy" . fst) coqterms
+    , "Import ListNotations."
+    , "Open Scope pair_scope."
+    , "Open Scope bs."
+    , ""
+    ] ++ map (uncurry coqDefTemplate) coqterms
+    -- [ "From RustExtraction Require Import ExtrRustBasic."
+    -- , "From RustExtraction Require Import ExtrRustUncheckedArith."
+    -- ] ++ map (coqExtractTemplate "dummy" . fst) coqterms
 
   coqDefTemplate :: String -> String -> String
   coqDefTemplate n d =  "Definition " <> n <> " : term := " <> d <> ".\n"

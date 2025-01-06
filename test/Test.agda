@@ -64,7 +64,6 @@ mutual
   g : ℕ → ℕ
   g Z     = Z
   g (S n) = S (S (f n))
--}
 
 open import Agda.Builtin.List using (List; []; _∷_)
 
@@ -91,3 +90,4 @@ plus3 = map (λ n → n + 3)
 
 doubleLambda : Nat → Nat → Nat
 doubleLambda = λ a b → a + 2 * b
+-}

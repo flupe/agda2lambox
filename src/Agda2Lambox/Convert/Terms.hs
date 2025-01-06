@@ -6,45 +6,42 @@ import Data.List ( elemIndex )
 
 import Utils
 
+import Agda ( liftTCM, getConstructorData, getConstructors )
 import qualified Agda as A
 import Agda.Lib ( )
 import Agda.Utils
+import Agda.Syntax.Literal
 
 import qualified LambdaBox as L
 
 import Agda2Lambox.Monad
 import Agda2Lambox.Convert.Class
--- import Agda2Lambox.Convert.Names
--- import Agda2Lambox.Convert.Literals
--- import Agda2Lambox.Convert.Builtins
--- import Agda2Lambox.Convert.Types
 
-fixme :: L.Name
-fixme = L.Named "FIXME"
 
 -- | Compiling (treeless) Agda terms into Lambox expressions.
 instance A.TTerm ~> L.Term where
   go = \case
-    A.TVar n -> return $ L.Rel n -- Can variables be erased?
-    A.TPrim tp -> go tp
+    A.TVar n   -> return $ L.Rel n
+    A.TPrim pr -> go pr 
     A.TDef qn -> do
       Env{..} <- ask
-      case qn `elemIndex` mutuals of
-        Nothing -> return $ L.Var (unqual qn)
-        Just i  -> return $ L.Rel (i + boundVars)
+      return case qn `elemIndex` mutuals of
+        Nothing -> L.Var (unqual qn)
+        Just i  -> L.Rel (i + boundVars) -- NOTE(flupe): this looks fishy
+                                         --              this isn't a (locally-bound) var
+                                         --              but a constant?
     A.TApp t args -> do
-      ct <- go t
+      ct    <- go t
       cargs <- mapM go args
       return $ foldl L.App ct cargs
-    A.TLam tt -> inBoundVar $
-      L.Lam L.Anon <$> go tt
-    A.TLit l -> return $ L.Const (show l) -- FIXME: How are literals represented in λ□?
+    A.TLam t -> inBoundVar $ L.Lam <$> go t
+    A.TLit l -> go l
     A.TCon qn -> do
-      dt   <- A.liftTCM $ A.getConstructorData qn
-      ctrs <- A.liftTCM $ A.getConstructors dt
+      dt   <- liftTCM $ getConstructorData qn
+      ctrs <- liftTCM $ getConstructors dt
       Just i <- pure $ qn `elemIndex` ctrs
-      return $ L.Ctor (L.Inductive $ unqual dt) i
-    A.TLet tt tu -> L.Let L.Anon <$> go tt <*> go tu -- FIXME: name
+      return $ L.Ctor (L.Inductive (unqual dt) 0) i -- TODO(flupe) mutual inductives
+    A.TLet tt tu -> L.Let <$> go tt <*> inBoundVar (go tu)
     A.TCase n A.CaseInfo{..} tt talts ->
       case caseErased of
         A.Erased _ -> fail "Erased matches are not supported."
@@ -55,7 +52,7 @@ instance A.TTerm ~> L.Term where
     A.TUnit -> return L.Box
     A.TSort -> return L.Box
     A.TErased -> return L.Box
-    A.TCoerce tt -> fail "Coerces are not supported."
+    A.TCoerce tt  -> fail "Coerces are not supported."
     A.TError terr -> fail "Errors are not supported."
 
 instance A.TAlt ~> (Int, L.Term) where
@@ -66,9 +63,19 @@ instance A.TAlt ~> (Int, L.Term) where
 
 instance A.CaseType ~> L.Inductive where
   go = \case
-    A.CTData qn -> return $ L.Inductive (unqual qn)
-    A.CTNat -> return $ L.Inductive "Nat"
+    A.CTData qn -> return $ L.Inductive (unqual qn) 0 -- TODO(flupe): handle mutual inductive
+    A.CTNat -> return $ L.Inductive "Nat" 0           -- TODO(flupe): idem
     _ -> fail ""
+
+-- TODO(flupe): handle using MetaCoq tPrim and prim_val
+instance A.Literal ~> L.Term where
+  go = \case
+    LitNat    n -> fail "Literal natural numbers not supported"
+    LitWord64 w -> fail "Literal int64 not supported"
+    LitFloat  f -> fail "Literal float not supported"
+    LitString s -> fail "Literal string not supported"
+    LitChar   c -> fail "Literal char not supported"
+    _           -> fail "Literal not supported"
 
 instance A.TPrim ~> L.Term where
   go = \case

@@ -7,11 +7,11 @@ import Agda.Syntax.Common.Pretty
 type Ident = String
 type KName = String
 
-newtype Inductive = Inductive String
+data Inductive = Inductive String Int
   deriving (Eq)
 
 instance Show Inductive where
-  show (Inductive s) = show s
+  show (Inductive s _) = show s
 
 data Name = Anon | Named Ident
   deriving (Eq, Show)
@@ -63,8 +63,8 @@ data Term
   = Box             -- ^ Proofs and erased terms
   | Rel Int         -- ^ Bound variable, with de Bruijn index
   | Var Ident       -- ^ Free variable with identifier
-  | Lam Name Term   -- ^ Lambda abstraction
-  | Let Name Term Term  
+  | Lam Term        -- ^ Lambda abstraction
+  | Let Term Term  
       -- ^ Let bindings.
       --   Unused in the backend, since Agda itself no longer has let bindings
       --   in the concrete syntac.
@@ -85,14 +85,13 @@ instance Pretty Term where
       Box    -> text "⫿"
       Rel x -> text $ "@" ++ show x
       Var s -> text s
-      Lam s t ->
+      Lam t ->
         mparens (p > 0) $
-        sep [ "λ" <+> pretty s <+> "->"
+        sep [ "λ _ ->"
             , nest 2 (pretty t) ]
-      Let x e t ->
+      Let e t ->
         mparens (p > 0) $
-        sep [ "let" <+> sep [ pretty x <+> "="
-                            , nest 2 (pretty e) ]
+        sep [ "let _ =" <+> nest 2 (pretty e)
             , pretty t ]
       App t t' ->
         mparens (p > 9) $
@@ -114,7 +113,7 @@ instance Pretty Term where
 
 
 instance Pretty Inductive where
-  prettyPrec _ (Inductive s) = text s
+  prettyPrec _ (Inductive s _) = text s
 
 instance Pretty Name where
   prettyPrec _ = \case
