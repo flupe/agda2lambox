@@ -1,12 +1,11 @@
-# Minimal skeleton for developing a new Agda backend 
+# agda2lambox
 
-- The backend is defined in `src/Main.hs`.
-- The `test/` directory contains an example compilation of `Test.agda` to `Test.txt`.
-
+An Agda backend to generate MetaCoq LambdaBox code for future (certified) extraction to WASM or RUST.
+The backend builds upon Agda 2.7.0.1.
 
 ## Setup
 
-Works with Coq 8.20.0 and MetaCoq 1.3.2.
+Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
 
 ## TODO
 
@@ -19,6 +18,9 @@ Works with Coq 8.20.0 and MetaCoq 1.3.2.
 
 ## References
 
+- [The MetaCoq Project](https://github.com/MetaCoq/metacoq)
+- [The CertiCoq Compilation pipeline](https://github.com/CertiCoq/certicoq/wiki/The-CertiCoq-pipeline)
+- [CertiCoqWASM](https://github.com/womeier/certicoqwasm)
 - [Pierre Letouzey's thesis introducing LamndaBox](https://www.irif.fr/~letouzey/download/these_letouzey.pdf) (in French)
 - [Verified Extraction from Coq to OCaml](https://github.com/yforster/coq-verified-extraction/)
   and its [accompanying paper](https://dl.acm.org/doi/10.1145/3656379)
@@ -27,3 +29,4 @@ Works with Coq 8.20.0 and MetaCoq 1.3.2.
 - [Erasure of types in MetaCoq](https://github.com/MetaCoq/metacoq/blob/coq-8.20/erasure/theories/Typed/Erasure.v#L765)
 - [Coq Extraction Pipeline](https://gist.github.com/4ever2/991007b4418b0ba44f2ee7ed51147e19)
 - [MetaCoq Extracted Terms](https://metacoq.github.io/metacoq/html/MetaCoq.Erasure.EAst.html)
+- [Extraction Example](https://gist.github.com/4ever2/7fbfb3bf843c4773c933c2fdf6315b5c)
