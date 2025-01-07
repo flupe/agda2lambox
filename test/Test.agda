@@ -26,7 +26,7 @@ not''' : Bool → Bool
 not''' = M.go where module M where go = λ where
   true  → false
   false → true
--}
+  -}
 
 module _ (a : Set) where data Maybe : Set where
   nothing : Maybe

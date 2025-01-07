@@ -3,10 +3,17 @@
 - The backend is defined in `src/Main.hs`.
 - The `test/` directory contains an example compilation of `Test.agda` to `Test.txt`.
 
+
+## Setup
+
+Works with Coq 8.20.0 and MetaCoq 1.3.2.
+
 ## TODO
 
+- [ ] Fix generation of Coq code
 - [ ] Setup compilation to WASM/RUST
 - [ ] Setup proper testing infrastructure
+- [ ] Proper management of inductive declarations
 - [ ] Support mutual definitions
 - [ ] Support literals (ints and floats)
 
