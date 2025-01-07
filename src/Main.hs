@@ -141,12 +141,9 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
   coqModuleTemplate :: [(String, String)] -> String
   coqModuleTemplate coqterms = unlines $
     [ "From MetaCoq.Common Require Import BasicAst Kernames."
-    , "From MetaCoq.Erasure.Typed Require Import ExAst."
+    , "From MetaCoq.Erasure Require Import EAst."
     , "From MetaCoq.Utils Require Import bytestring MCString."
-    , "From Coq Require Import Arith."
-    , "From Coq Require Import Bool."
     , "From Coq Require Import List."
-    , "From Coq Require Import Program."
 
     , ""
     , "Import ListNotations."
