@@ -17,8 +17,10 @@ import Paths_agda2lambox ( version )
 import Agda.Lib
 import Agda.Utils (pp, unqual)
 
+import LambdaBox (Term(..), KerName(..), GlobalDecl(..), ModPath(..) )
 import qualified LambdaBox as L
 import Agda2Lambox.Convert ( convert )
+import Agda2Lambox.Convert.Function ( convertFunction )
 import Agda2Lambox.Monad ( runC0, inMutuals )
 import Lambox2Coq
 
@@ -63,7 +65,7 @@ instance Show CompiledDef where
             -- , pre <> term2Coq lterm
             ]
 
-backend :: Backend' Options Options ModuleEnv ModuleRes (Maybe CompiledDef)
+backend :: Backend' Options Options ModuleEnv ModuleRes (Maybe (KerName, GlobalDecl))
 backend = Backend'
   { backendName           = "agda2lambox"
   , backendVersion        = Just (showVersion version)
@@ -102,22 +104,15 @@ ignoreDef d@Defn{..}
   | otherwise
   = True
 
-compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM (Maybe CompiledDef)
+compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM (Maybe (KerName, GlobalDecl))
 compile _ _ _ defn | ignoreDef defn = return Nothing
-compile opts tlm _ defn@Defn{..} =
-  withCurrentModule (qnameModule defName) do
-    Just tterm <- toTreeless EagerEvaluation defName
-    let Function{..} = theDef
-        Just ds      = funMutual
-    tm <- runC0 (inMutuals ds $ convert tterm)
-    ty <- runC0 (convert (unEl $ defType)) 
-    let tm' = case ds of []    -> tm
-                         [d]   -> L.Fix [L.Def (L.Named $ pp defName) tm 0] 0
-                         _:_:_ -> error "Mutual recursion not supported."
-    return $ Just $ CompiledDef defName tterm defType ty tm'
+compile opts tlm _ def@Defn{..} = do
+  body <- runC0 $ convertFunction def
+  return $ Just $ ( KerName (MPFile []) (pp defName)
+                  , ConstantDecl $ Just body)
 
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
-            -> [Maybe CompiledDef]
+            -> [Maybe (KerName, GlobalDecl)]
             -> TCM ModuleRes
 writeModule opts _ _ m (catMaybes -> cdefs) = do
   compDir <- compileDir
@@ -135,11 +130,11 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
 
     writeFile (fileName ".v")
       $ coqModuleTemplate
-      $ map (\cdef -> (unqual (name cdef), term2Coq (lterm cdef))) cdefs
+      $ decls2Coq cdefs
 
   where
-  coqModuleTemplate :: [(String, String)] -> String
-  coqModuleTemplate coqterms = unlines $
+  coqModuleTemplate :: Coq -> String
+  coqModuleTemplate coqterms = unlines
     [ "From MetaCoq.Common Require Import BasicAst Kernames."
     , "From MetaCoq.Erasure Require Import EAst."
     , "From MetaCoq.Utils Require Import bytestring MCString."
@@ -150,10 +145,12 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
     , "Open Scope pair_scope."
     , "Open Scope bs."
     , ""
-    ] ++ map (uncurry coqDefTemplate) coqterms
+    ] ++ coqDecls coqterms
     -- [ "From RustExtraction Require Import ExtrRustBasic."
     -- , "From RustExtraction Require Import ExtrRustUncheckedArith."
     -- ] ++ map (coqExtractTemplate "dummy" . fst) coqterms
+  coqDecls :: String -> String
+  coqDecls ds =  "Definition env : global_declarations  := " <> ds <> ".\n"
 
   coqDefTemplate :: String -> String -> String
   coqDefTemplate n d =  "Definition " <> n <> " : term := " <> d <> ".\n"

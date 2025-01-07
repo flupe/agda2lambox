@@ -6,7 +6,7 @@ import Data.Bifunctor(bimap)
 import Data.List(intercalate)
 
 import Agda2Lambox.Convert.Class(type (~>)(..), (:~>))
-import LambdaBox(Def(..), Name(..), Term(..), Inductive(..))
+import LambdaBox
 
 -- Helpers for generating Coq syntax
 
@@ -53,18 +53,42 @@ ind2Coq (Inductive mind ind) = record
   , ("inductive_ind" , show ind)
   ]
 
+dirpath2Coq :: DirPath -> Coq
+dirpath2Coq = list . map show
+
+modpath2Coq :: ModPath -> Coq
+modpath2Coq = \case
+  MPFile dp       -> ctor "MPfile" [dirpath2Coq dp]
+  MPBound dp id i -> ctor "MPbound" [dirpath2Coq dp, show id, show i]
+  MPDot mp id     -> ctor "MPdot" [modpath2Coq mp, show id]
+
+kername2Coq :: KerName -> Coq
+kername2Coq KerName{..} = pair (modpath2Coq kerModPath) (show kerName)
+
+constant2Coq :: ConstantBody -> Coq
+constant2Coq Nothing = ctor "None" []
+constant2Coq (Just x) = ctor "Some" [term2Coq x]
+
+decl2Coq :: GlobalDecl -> Coq
+decl2Coq = \case
+  ConstantDecl body   -> ctor "ConstantDecl" [record [("cst_body", constant2Coq body)]]
+  InductiveDecl mbody -> error "I cannot do this rn"
+
+decls2Coq :: [(KerName, GlobalDecl)] -> Coq
+decls2Coq = list . map (uncurry pair . bimap kername2Coq decl2Coq)
+
 term2Coq :: Term -> Coq
 term2Coq =  \case
-  Box              -> ctor "tBox" []
-  Rel n            -> ctor "tRel" [show n]
-  Var i            -> ctor "tVar" [show i]
-  Lam e            -> ctor "tLambda" [name2Coq Anon, term2Coq e]
-  Let b e          -> ctor "tLetIn" [name2Coq Anon, term2Coq b, term2Coq e]
-  App f e          -> ctor "tApp" [term2Coq f, term2Coq e]
-  Const k          -> ctor "tConst" [kername k]
-  Ctor ind idx     -> ctor "tConstruct" [ind2Coq ind, show idx, list []]
-  Fix defs idx     -> ctor "tFix" [list $ def2Coq <$> defs, show idx]
-  Case ind n c brs ->
+  LBox              -> ctor "tBox" []
+  LRel n            -> ctor "tRel" [show n]
+  LVar i            -> ctor "tVar" [show i]
+  LLam e            -> ctor "tLambda" [name2Coq Anon, term2Coq e]
+  LLet b e          -> ctor "tLetIn" [name2Coq Anon, term2Coq b, term2Coq e]
+  LApp f e          -> ctor "tApp" [term2Coq f, term2Coq e]
+  LConst k          -> ctor "tConst" [kername k]
+  LCtor ind idx     -> ctor "tConstruct" [ind2Coq ind, show idx, list []]
+  LFix defs idx     -> ctor "tFix" [list $ def2Coq <$> defs, show idx]
+  LCase ind n c brs ->
     let cbrs :: [Coq] = for brs \(nargs, b) ->
           let binders = take nargs $ repeat Anon
           in pair (list $ map name2Coq binders) (term2Coq b)

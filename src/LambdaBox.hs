@@ -1,8 +1,8 @@
-{-# LANGUAGE OverloadedStrings , LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 module LambdaBox where
 
--- import qualified Agda as A
 import Agda.Syntax.Common.Pretty
+import System.FilePath ( FilePath )
 
 type Ident = String
 type KName = String
@@ -58,59 +58,117 @@ instance Pretty Type where
       TConst kname ->
         text kname
 
+-- MetaCoq.Template.Kernames
 
+type DirPath = [Ident]
+
+-- | The module part of the kernel name
+data ModPath 
+  = MPFile DirPath
+     -- ^ toplevel libraries i.e. .vo files
+  | MPBound DirPath Ident Int
+     -- ^ parameters of functors 
+     -- NOTE(flupe): ????
+  | MPDot ModPath Ident 
+     -- ^ submodules
+  deriving Show
+
+-- | Absolute name of objects in the Coq kernel
+data KerName = KerName 
+  { kerModPath :: ModPath
+  , kerName    :: Ident 
+  } deriving Show
+
+-- TODO(flupe): make this closer to the EAst defined in MetaCoq 1.3.2
 data Term
-  = Box             -- ^ Proofs and erased terms
-  | Rel Int         -- ^ Bound variable, with de Bruijn index
-  | Var Ident       -- ^ Free variable with identifier
-  | Lam Term        -- ^ Lambda abstraction
-  | Let Term Term  
+  = LBox             -- ^ Proofs and erased terms
+  | LRel Int         -- ^ Bound variable, with de Bruijn index
+  | LVar Ident       -- ^ Free variable with identifier
+      -- NOTE(flupe): not needed?
+  | LLam Term        -- ^ Lambda abstraction
+  | LLet Term Term  
       -- ^ Let bindings.
       --   Unused in the backend, since Agda itself no longer has let bindings
       --   in the concrete syntac.
-  | App Term Term       -- ^ Term application
-  | Const KName         -- ^ Named constant.
-  | Ctor Inductive Int  -- ^ Inductive constructor.
-  | Case Inductive Int Term [(Int, Term)]
+  | LApp Term Term       -- ^ Term application
+  | LConst KName         -- ^ Named constant.
+  | LCtor Inductive Int  -- ^ Inductive constructor.
+  | LCase Inductive Int Term [(Int, Term)]
       -- ^ Pattern-matching case construct.
-  | Fix [Def] Int
+  | LFix [Def] Int
      -- ^ Fixpoint combinator.
-     -- NOTE(flupe): Why no terms?
   deriving (Eq, Show)
 
+data AllowedElims = IntoSProp | IntoPropSProp | IntoSetPropSProp | IntoAny
+  deriving Show
+
+data ConstructorBody = Ctor 
+  { ctorName :: Ident
+  , ctorArgs :: Int
+  } deriving Show
+
+data ProjectionBody = Proj
+  { projName :: Ident
+  , projArgs :: Int
+  } deriving Show
+
+-- | Inductive datatype declaration body
+data OneInductiveBody = OneInductive
+  { indName          :: Ident
+  , indPropositional :: Bool
+  , indKElim         :: AllowedElims
+  , indCtors         :: [ConstructorBody]
+  , indProjs         :: [ProjectionBody]
+  } deriving Show
+
+-- | Declaration of mutually defined inductive types
+data MutualInductiveBody = MutualInductive
+  { indPars   :: Int
+  , indBodies :: [OneInductiveBody]
+  } deriving Show
+
+-- | Definition of a constant in the environment
+type ConstantBody = Maybe Term
+
+-- | Global declarations.
+data GlobalDecl 
+  = ConstantDecl ConstantBody
+  | InductiveDecl MutualInductiveBody
+  deriving Show
+
+type GlobalDecls = [(KerName, GlobalDecl)]
 
 instance Pretty Term where
   prettyPrec p v =
     case v of
-      Box    -> text "⫿"
-      Rel x -> text $ "@" ++ show x
-      Var s -> text s
-      Lam t ->
+      LBox    -> text "⫿"
+      LRel x -> text $ "@" ++ show x
+      LVar s -> text s
+      LLam t ->
         mparens (p > 0) $
         sep [ "λ _ ->"
             , nest 2 (pretty t) ]
-      Let e t ->
+      LLet e t ->
         mparens (p > 0) $
         sep [ "let _ =" <+> nest 2 (pretty e)
             , pretty t ]
-      App t t' ->
+      LApp t t' ->
         mparens (p > 9) $
         sep [ pretty t
             , nest 2 $ prettyPrec 10 t' ]
-      Const s ->
+      LConst s ->
         mparens (p > 0) $
         text s
-      Ctor ind i ->
+      LCtor ind i ->
         pretty ind <> "#" <> pretty i
-      Case ind n t bs ->
+      LCase ind n t bs ->
         mparens (p > 0) $
         sep [ ("case<" <> pretty ind <> "," <> pretty n <> ">") <+> pretty t <+> "of"
             , nest 2 $ vcat (map (\(n, e) -> sep ["λ<" <> pretty n <> ">", nest 2 (pretty e)]) bs) ]
-      Fix ds i -> -- FIXME: for mutual recursion
+      LFix ds i -> -- FIXME: for mutual recursion
         mparens (p > 0) $
         sep [ "μ rec ->"
             , nest 2 (pretty $ ds !! i) ]
-
 
 instance Pretty Inductive where
   prettyPrec _ (Inductive s _) = text s

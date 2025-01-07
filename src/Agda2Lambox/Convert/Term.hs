@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances #-}
-module Agda2Lambox.Convert.Terms () where
+module Agda2Lambox.Convert.Term () where
 
 import Control.Monad.Reader ( ask, liftIO )
 import Data.List ( elemIndex )
@@ -12,6 +12,7 @@ import Agda.Lib ( )
 import Agda.Utils
 import Agda.Syntax.Literal
 
+import LambdaBox (Term(..))
 import qualified LambdaBox as L
 
 import Agda2Lambox.Monad
@@ -21,37 +22,37 @@ import Agda2Lambox.Convert.Class
 -- | Compiling (treeless) Agda terms into Lambox expressions.
 instance A.TTerm ~> L.Term where
   go = \case
-    A.TVar n   -> return $ L.Rel n
+    A.TVar n   -> return $ LRel n
     A.TPrim pr -> go pr 
     A.TDef qn -> do
       Env{..} <- ask
       return case qn `elemIndex` mutuals of
-        Nothing -> L.Var (unqual qn)
-        Just i  -> L.Rel (i + boundVars) -- NOTE(flupe): this looks fishy
+        Nothing -> LVar (unqual qn)
+        Just i  -> LRel (i + boundVars) -- NOTE(flupe): this looks fishy
                                          --              this isn't a (locally-bound) var
                                          --              but a constant?
     A.TApp t args -> do
       ct    <- go t
       cargs <- mapM go args
-      return $ foldl L.App ct cargs
-    A.TLam t -> inBoundVar $ L.Lam <$> go t
+      return $ foldl LApp ct cargs
+    A.TLam t -> inBoundVar $ LLam <$> go t
     A.TLit l -> go l
     A.TCon qn -> do
       dt   <- liftTCM $ getConstructorData qn
       ctrs <- liftTCM $ getConstructors dt
       Just i <- pure $ qn `elemIndex` ctrs
-      return $ L.Ctor (L.Inductive (unqual dt) 0) i -- TODO(flupe) mutual inductives
-    A.TLet tt tu -> L.Let <$> go tt <*> inBoundVar (go tu)
+      return $ LCtor (L.Inductive (unqual dt) 0) i -- TODO(flupe) mutual inductives
+    A.TLet tt tu -> LLet <$> go tt <*> inBoundVar (go tu)
     A.TCase n A.CaseInfo{..} tt talts ->
       case caseErased of
         A.Erased _ -> fail "Erased matches are not supported."
         A.NotErased _ -> do
           calts <- traverse go talts
           cind <- go caseType
-          return $ L.Case cind 0 (L.Rel n) calts
-    A.TUnit -> return L.Box
-    A.TSort -> return L.Box
-    A.TErased -> return L.Box
+          return $ LCase cind 0 (LRel n) calts
+    A.TUnit -> return LBox
+    A.TSort -> return LBox
+    A.TErased -> return LBox
     A.TCoerce tt  -> fail "Coerces are not supported."
     A.TError terr -> fail "Errors are not supported."
 
@@ -79,6 +80,6 @@ instance A.Literal ~> L.Term where
 
 instance A.TPrim ~> L.Term where
   go = \case
-    A.PAdd -> return $ L.Const "Nat.add"
-    A.PMul -> return $ L.Const "Nat.mult"
+    A.PAdd -> return $ LConst "Nat.add"
+    A.PMul -> return $ LConst "Nat.mult"
     _ -> fail ""

@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances #-}
-module Agda2Lambox.Convert.Types () where
+module Agda2Lambox.Convert.Type () where
 
 
 import Utils
