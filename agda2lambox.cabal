@@ -23,11 +23,10 @@ executable agda2lambox
                        Agda2Lambox.Convert.Class,
                        Agda2Lambox.Convert.Term,
                        Agda2Lambox.Convert.Function,
-                       Agda2Lambox.Convert.Type,
                        Agda2Lambox,
                        Utils,
                        LambdaBox,
-                       Lambox2Coq,
+                       CoqGen,
                        Paths_agda2lambox
   autogen-modules:     Paths_agda2lambox
   build-depends:       base >= 4.10 && < 4.22,

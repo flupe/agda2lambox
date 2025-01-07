@@ -1,6 +1,6 @@
 # agda2lambox
 
-An Agda backend to generate MetaCoq LambdaBox code for future (certified) extraction to WASM or RUST.
+An Agda backend to generate MetaCoq LambdaBox code for further (certified) extraction to WASM or RUST.
 The backend builds upon Agda 2.7.0.1.
 
 ## Setup
@@ -9,12 +9,15 @@ Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
 
 ## TODO
 
-- [ ] Fix generation of Coq code
+- [x] Fix generation of Coq code
+- [x] Add Coq pretty-printing
+- [ ] Support mutual definitions
+- [ ] Support one-inductive
+- [ ] Support mutual inductives
+- [ ] "Support" modules
+- [ ] Support literals (ints and floats)
 - [ ] Setup compilation to WASM/RUST
 - [ ] Setup proper testing infrastructure
-- [ ] Proper management of inductive declarations
-- [ ] Support mutual definitions
-- [ ] Support literals (ints and floats)
 
 ## References
 

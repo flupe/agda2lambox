@@ -8,11 +8,13 @@ import Utils
 
 import Agda ( liftTCM, getConstructorData, getConstructors )
 import qualified Agda as A
-import Agda.Lib ( )
+import Agda.Lib ()
 import Agda.Utils
 import Agda.Syntax.Literal
+import Agda.Syntax.Abstract.Name ( QName(..), ModuleName(..) )
+import Agda.Syntax.Common.Pretty ( prettyShow )
 
-import LambdaBox (Term(..))
+import LambdaBox
 import qualified LambdaBox as L
 
 import Agda2Lambox.Monad
@@ -41,11 +43,13 @@ instance A.TTerm ~> L.Term where
       dt   <- liftTCM $ getConstructorData qn
       ctrs <- liftTCM $ getConstructors dt
       Just i <- pure $ qn `elemIndex` ctrs
-      return $ LCtor (L.Inductive (unqual dt) 0) i -- TODO(flupe) mutual inductives
+      return $ LCtor (L.Inductive (qnameToKerName dt) 0) i [] 
+      -- TODO(flupe): I *think* constructors have to be fully-applied
+      -- TODO(flupe): mutual inductives
     A.TLet tt tu -> LLet <$> go tt <*> inBoundVar (go tu)
     A.TCase n A.CaseInfo{..} tt talts ->
       case caseErased of
-        A.Erased _ -> fail "Erased matches are not supported."
+        A.Erased _    -> fail "Erased matches are not supported."
         A.NotErased _ -> do
           calts <- traverse go talts
           cind <- go caseType
@@ -56,17 +60,17 @@ instance A.TTerm ~> L.Term where
     A.TCoerce tt  -> fail "Coerces are not supported."
     A.TError terr -> fail "Errors are not supported."
 
-instance A.TAlt ~> (Int, L.Term) where
+instance A.TAlt ~> ([Name], L.Term) where
   go = \case
-    A.TACon{..} -> (aArity,) <$> inBoundVars aArity (go aBody)
-    A.TALit{..} -> (0,) <$> go aBody
+    A.TACon{..}   -> (take aArity $ repeat Anon,) <$> inBoundVars aArity (go aBody)
+    A.TALit{..}   -> ([],)                        <$> go aBody
     A.TAGuard{..} -> fail "TAGuard"
 
 instance A.CaseType ~> L.Inductive where
   go = \case
-    A.CTData qn -> return $ L.Inductive (unqual qn) 0 -- TODO(flupe): handle mutual inductive
-    A.CTNat -> return $ L.Inductive "Nat" 0           -- TODO(flupe): idem
-    _ -> fail ""
+    A.CTData qn -> return $ L.Inductive (qnameToKerName qn) 0 
+                   -- TODO(flupe): handle mutual inductive
+    _           -> fail "Not supported case type"
 
 -- TODO(flupe): handle using MetaCoq tPrim and prim_val
 instance A.Literal ~> L.Term where
@@ -79,7 +83,4 @@ instance A.Literal ~> L.Term where
     _           -> fail "Literal not supported"
 
 instance A.TPrim ~> L.Term where
-  go = \case
-    A.PAdd -> return $ LConst "Nat.add"
-    A.PMul -> return $ LConst "Nat.mult"
-    _ -> fail ""
+  go = const $ fail "unsupported prim"

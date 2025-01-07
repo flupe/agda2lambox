@@ -1,4 +1,3 @@
-
 From MetaCoq.Template Require Import Loader.
 From MetaCoq.ErasurePlugin Require Import Erasure Loader.
 From MetaCoq.Utils Require Import utils.

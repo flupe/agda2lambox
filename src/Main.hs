@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, OverloadedStrings #-}
 
 module Main where
 
@@ -14,15 +14,16 @@ import System.FilePath ( (</>) )
 
 import Paths_agda2lambox ( version )
 
-import Agda.Lib
+import Agda.Lib hiding ( (<?>), pretty )
 import Agda.Utils (pp, unqual)
 
-import LambdaBox (Term(..), KerName(..), GlobalDecl(..), ModPath(..) )
+import LambdaBox
 import qualified LambdaBox as L
 import Agda2Lambox.Convert ( convert )
 import Agda2Lambox.Convert.Function ( convertFunction )
 import Agda2Lambox.Monad ( runC0, inMutuals )
-import Lambox2Coq
+import CoqGen ( ToCoq(ToCoq) )
+import Agda.Syntax.Common.Pretty ( (<?>), pretty )
 
 
 main :: IO ()
@@ -47,7 +48,6 @@ type ModuleRes = ()
 data CompiledDef = CompiledDef
   { name  :: QName
   , tterm :: TTerm
-  , atype :: Type 
   , ltype :: L.Type 
   , lterm :: L.Term
   }
@@ -57,7 +57,6 @@ instance Show CompiledDef where
     let pre  = pp (qnameName name) <> " = " in
     let preT = pp (qnameName name) <> " : " in  
     unlines [ "=== SOURCE ==="
-            , preT <> pp atype  
             , pre  <> pp tterm
             , "=== COMPILED ==="
             , preT <> pp ltype
@@ -108,7 +107,7 @@ compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM (Maybe (KerName, 
 compile _ _ _ defn | ignoreDef defn = return Nothing
 compile opts tlm _ def@Defn{..} = do
   body <- runC0 $ convertFunction def
-  return $ Just $ ( KerName (MPFile []) (pp defName)
+  return $ Just $ ( qnameToKerName defName
                   , ConstantDecl $ Just body)
 
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
@@ -129,11 +128,11 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
       $ unlines (show <$> cdefs)
 
     writeFile (fileName ".v")
-      $ coqModuleTemplate
-      $ decls2Coq cdefs
+      $ (<> "\n")
+      $ coqModuleTemplate cdefs
 
   where
-  coqModuleTemplate :: Coq -> String
+  coqModuleTemplate :: [(KerName, GlobalDecl)] -> String
   coqModuleTemplate coqterms = unlines
     [ "From MetaCoq.Common Require Import BasicAst Kernames."
     , "From MetaCoq.Erasure Require Import EAst."
@@ -146,14 +145,6 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
     , "Open Scope bs."
     , ""
     ] ++ coqDecls coqterms
-    -- [ "From RustExtraction Require Import ExtrRustBasic."
-    -- , "From RustExtraction Require Import ExtrRustUncheckedArith."
-    -- ] ++ map (coqExtractTemplate "dummy" . fst) coqterms
-  coqDecls :: String -> String
-  coqDecls ds =  "Definition env : global_declarations  := " <> ds <> ".\n"
 
-  coqDefTemplate :: String -> String -> String
-  coqDefTemplate n d =  "Definition " <> n <> " : term := " <> d <> ".\n"
-
-  coqExtractTemplate :: FilePath -> String -> String
-  coqExtractTemplate fp n = "Redirect \"./" <> n <> ".rs\" Rust Extract " <> n <> "."
+  coqDecls :: [(KerName, GlobalDecl)] -> String
+  coqDecls ds = pp $ "Definition env : global_declarations := " <?> (pretty (ToCoq ds) <> ".")

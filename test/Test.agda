@@ -37,6 +37,7 @@ fromMaybe def = λ where
   nothing  → def
   (just a) → a
 
+{-
 open import Agda.Builtin.Nat using (Nat; _+_; _*_)
 
 data Exp (v : Set) : Set where
@@ -49,7 +50,6 @@ eval env (Plus a b) = eval env a + eval env b
 eval env (Int n) = n
 eval env (Var x) = env x
 
-{-
 -- ** mutual recursion
 
 data ℕ : Set where
