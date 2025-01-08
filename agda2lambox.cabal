@@ -15,14 +15,15 @@ source-repository head
 executable agda2lambox
   hs-source-dirs:      src
   main-is:             Main.hs
-  other-modules:       Agda.Lib,
+  other-modules:       Agda,
+                       Agda.Lib,
                        Agda.Utils,
-                       Agda,
                        Agda2Lambox.Monad,
                        Agda2Lambox.Convert,
                        Agda2Lambox.Convert.Class,
-                       Agda2Lambox.Convert.Term,
+                       Agda2Lambox.Convert.Data,
                        Agda2Lambox.Convert.Function,
+                       Agda2Lambox.Convert.Term,
                        Agda2Lambox,
                        Utils,
                        LambdaBox,
@@ -33,8 +34,8 @@ executable agda2lambox
                        Agda >= 2.7 && <= 2.8,
                        deepseq >= 1.4.4 && < 1.6,
                        pretty-show,
-                       filepath,
                        directory,
+                       filepath,
                        mtl
   default-language:    Haskell2010
   default-extensions:

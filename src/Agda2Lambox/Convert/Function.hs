@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
+-- | Convert Agda functions to λ□ constant declarations
 module Agda2Lambox.Convert.Function 
   ( convertFunction
   ) where
@@ -39,28 +40,30 @@ convertFunctionBody Defn{defName} =
     Just t <- liftTCM $ toTreeless EagerEvaluation defName
     convert t
 
--- | Convert a function to a Lambdabox term.
-convertFunction :: Definition :~> Term
+-- | Convert a function definition to a λ□ declaration.
+convertFunction :: Definition :~> GlobalDecl
 convertFunction defn@Defn{defName, theDef} =
   withCurrentModule (qnameModule defName) do
     let Function{funMutual = Just ms} = theDef
 
-    if null ms then convertFunctionBody defn
+    if null ms then 
+      ConstantDecl . Just <$> convertFunctionBody defn
     else do
       mdefs :: [Definition] <- mapM getConstInfo ms
 
-      if (any (not . isFunction) mdefs) then
+      if any (not . isFunction) mdefs then
         fail "Induction-recursion and other weird mutual defs not supported."
       else inMutuals ms do
-        -- NOTE(flupe): 
+        -- NOTE(flupe):
         --   maybe reverse ms here?
         --   it's unclear in which order mutual fixpoints are added to the local context
         let Just k = elemIndex defName ms
 
-        flip LFix k <$> forM mdefs \def@Defn{defName} -> do
-          body <- convertFunctionBody def
-          return Def
-            { dName = Named $ prettyShow defName
-            , dBody = body
-            , dArgs = 0 -- TODO(flupe): when is this ever not zero?
-            }
+        ConstantDecl . Just . flip LFix k <$>
+          forM mdefs \def@Defn{defName} -> do
+            body <- convertFunctionBody def
+            return Def
+              { dName = Named $ prettyShow defName
+              , dBody = body
+              , dArgs = 0 -- TODO(flupe): when is this ever not zero?
+              }

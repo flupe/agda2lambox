@@ -5,7 +5,7 @@ module Main where
 import Control.Monad ( unless )
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Control.DeepSeq ( NFData(..) )
-import Data.Maybe ( fromMaybe, catMaybes, isJust )
+import Data.Maybe ( fromMaybe, catMaybes, isJust, isNothing )
 import Data.Version ( showVersion )
 import GHC.Generics ( Generic )
 import System.Console.GetOpt ( OptDescr(Option), ArgDescr(ReqArg) )
@@ -21,9 +21,11 @@ import LambdaBox
 import qualified LambdaBox as L
 import Agda2Lambox.Convert ( convert )
 import Agda2Lambox.Convert.Function ( convertFunction )
+import Agda2Lambox.Convert.Data     ( convertDatatype )
 import Agda2Lambox.Monad ( runC0, inMutuals )
 import CoqGen ( ToCoq(ToCoq) )
 import Agda.Syntax.Common.Pretty ( (<?>), pretty )
+import Agda.Syntax.Common (hasQuantityω)
 
 
 main :: IO ()
@@ -90,30 +92,28 @@ moduleSetup _ _ m _ = do
   setScope . iInsideScope =<< curIF
   return $ Recompile ()
 
--- | Which Agda definitions to ignore.
-ignoreDef :: Definition -> Bool
-ignoreDef d@Defn{..}
-  | hasQuantity0 d
-  = True
-  | Function {..} <- theDef
-  = (theDef ^. funInline) -- inlined functions (from module application)
-  -- || funErasure           -- @0 functions
-  || isJust funExtLam     -- pattern-lambdas
-  || isJust funWith       -- with-generated
-  | otherwise
-  = True
-
 compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM (Maybe (KerName, GlobalDecl))
-compile _ _ _ defn | ignoreDef defn = return Nothing
-compile opts tlm _ def@Defn{..} = do
-  body <- runC0 $ convertFunction def
-  return $ Just $ ( qnameToKerName defName
-                  , ConstantDecl $ Just body)
+compile opts tlm _ def@Defn{..} =
+  fmap (qnameToKerName defName,) <$> -- prepend kername
+    case theDef of
+
+      -- TODO(flupe): offload the check to Convert.Function
+      Function{..}
+        | not (theDef ^. funInline)  -- not inlined (from module application)
+        , isNothing funExtLam        -- not a pattern-lambda-generated function   NOTE(flupe): ?
+        , isNothing funWith          -- not a with-generated function             NOTE(flupe): ?
+        , hasQuantityω def           -- non-erased
+        -> Just <$> runC0 (convertFunction def)
+
+      Datatype{} -> Just <$> runC0 (convertDatatype def)
+
+      _          -> Nothing <$ (liftIO $ putStrLn $ "Skipping " <> prettyShow defName)
+
 
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
             -> [Maybe (KerName, GlobalDecl)]
             -> TCM ModuleRes
-writeModule opts _ _ m (catMaybes -> cdefs) = do
+writeModule opts _ _ m (reverse . catMaybes -> cdefs) = do
   compDir <- compileDir
 
   let outDir   = fromMaybe compDir (optOutDir opts)
@@ -134,7 +134,7 @@ writeModule opts _ _ m (catMaybes -> cdefs) = do
   where
   coqModuleTemplate :: [(KerName, GlobalDecl)] -> String
   coqModuleTemplate coqterms = unlines
-    [ "From MetaCoq.Common Require Import BasicAst Kernames."
+    [ "From MetaCoq.Common Require Import BasicAst Kernames Universes."
     , "From MetaCoq.Erasure Require Import EAst."
     , "From MetaCoq.Utils Require Import bytestring MCString."
     , "From Coq Require Import List."

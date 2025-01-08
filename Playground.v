@@ -52,7 +52,7 @@ with odd (n : nat)  :=
     | S n => even n
   end.
 
-Definition prog  := even 2 || odd 2.
+Definition prog  := double.
 
 MetaCoq Quote Recursively Definition ex1 := prog.
 Eval vm_compute in cic_to_box ex1.

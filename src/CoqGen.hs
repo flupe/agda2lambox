@@ -41,6 +41,9 @@ instance {-# OVERLAPPING #-} Pretty (ToCoq String) where
 instance Pretty (ToCoq Int) where
   pretty = pretty . unwrap
 
+instance Pretty (ToCoq Bool) where
+  pretty (ToCoq v) = if v then "true" else "false"
+
 instance Pretty (ToCoq a) => Pretty (ToCoq (Maybe a)) where
   pretty (ToCoq x) =
     case x of
@@ -89,13 +92,55 @@ instance Pretty (ToCoq ModPath) where
 instance Pretty (ToCoq KerName) where
   pretty (ToCoq KerName{..}) = pcoq (kerModPath, kerName)
 
+instance Pretty (ToCoq RecursivityKind) where
+  pretty (ToCoq rk) =
+    case rk of
+      Finite   -> ctor "Finite"   []
+      CoFinite -> ctor "CoFinite" []
+      BiFinite -> ctor "BiFinite" []
+
+instance Pretty (ToCoq AllowedElims) where
+  pretty (ToCoq ae) =
+    case ae of
+      IntoSProp        -> ctor "IntoSProp"        []
+      IntoPropSProp    -> ctor "IntoPropSProp"    []
+      IntoSetPropSProp -> ctor "IntoSetPropSProp" []
+      IntoAny          -> ctor "IntoAny"          []
+
+instance Pretty (ToCoq ConstructorBody) where
+  pretty (ToCoq Ctor{..}) =
+    record [ ("cstr_name",  pcoq ctorName)
+           , ("cstr_nargs", pcoq ctorArgs)
+           ]
+
+instance Pretty (ToCoq ProjectionBody) where
+  pretty (ToCoq Proj{..}) =
+    record [ ("proj_name",  pcoq projName)
+           ]
+
+instance Pretty (ToCoq OneInductiveBody) where
+  pretty (ToCoq OneInductive{..}) =
+    record [ ("ind_name",          pcoq indName)
+           , ("ind_propositional", pcoq indPropositional)
+           , ("ind_kelim",         pcoq indKElim)
+           , ("ind_ctors",         pcoq indCtors)
+           , ("ind_projs",         pcoq indProjs)
+           ]
+
+instance Pretty (ToCoq MutualInductiveBody) where
+  pretty (ToCoq MutualInductive{..}) =
+    record [ ("ind_finite", pcoq indFinite)
+           , ("ind_npars",  pcoq indPars)
+           , ("ind_bodies", pcoq indBodies)
+           ]
+
 instance Pretty (ToCoq GlobalDecl) where
   pretty (ToCoq decl) =
     case decl of
       ConstantDecl  body  ->
         ctor "ConstantDecl" [record [("cst_body", pcoq body)]]
       InductiveDecl minds ->
-        ctor "InductiveDecl" []
+        ctor "InductiveDecl" [pcoq minds]
 
 instance Pretty (ToCoq t) => Pretty (ToCoq (Def t)) where
   pretty (ToCoq Def{..}) =

@@ -149,14 +149,13 @@ data AllowedElims
   | IntoAny
   deriving (Eq, Show)
 
-data ConstructorBody = Ctor 
+data ConstructorBody = Ctor
   { ctorName :: Ident
   , ctorArgs :: Int
   } deriving (Eq, Show)
 
 data ProjectionBody = Proj
   { projName :: Ident
-  , projArgs :: Int
   } deriving (Eq, Show)
 
 -- | Inductive datatype declaration body
@@ -168,9 +167,16 @@ data OneInductiveBody = OneInductive
   , indProjs         :: [ProjectionBody]
   } deriving (Eq, Show)
 
+data RecursivityKind
+  = Finite   -- ^ Inductive datatype.
+  | CoFinite -- ^ Coinductive datatype.
+  | BiFinite -- ^ Non-recursive.
+  deriving (Eq, Show)
+
 -- | Declaration of mutually defined inductive types
 data MutualInductiveBody = MutualInductive
-  { indPars   :: Int
+  { indFinite :: RecursivityKind
+  , indPars   :: Int
   , indBodies :: [OneInductiveBody]
   } deriving (Eq, Show)
 
@@ -178,7 +184,7 @@ data MutualInductiveBody = MutualInductive
 type ConstantBody = Maybe Term
 
 -- | Global declarations.
-data GlobalDecl 
+data GlobalDecl
   = ConstantDecl ConstantBody
   | InductiveDecl MutualInductiveBody
   deriving (Eq, Show)

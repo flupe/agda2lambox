@@ -4,6 +4,10 @@ data Nat : Set where
   zero : Nat
   succ : Nat -> Nat
 
+double : Nat -> Nat
+double zero = zero
+double (succ n) = succ (succ (double n))
+
 odd even : Nat -> Bool
 
 odd zero = false

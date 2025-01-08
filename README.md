@@ -12,10 +12,14 @@ Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
 - [x] Fix generation of Coq code
 - [x] Add Coq pretty-printing
 - [x] Support mutual definitions
-- [ ] Support one-inductive
+- [x] Support one-inductive
 - [ ] Support mutual inductives
 - [ ] Better error-reporting
 - [ ] "Support" modules
+- [ ] Check support for Agda-specific edge cases
+  - [ ] Pattern-matching lambdas
+  - [ ] With-generated lambdas
+  - [ ] Module applications
 - [ ] Support literals (ints and floats)
 - [ ] Setup compilation to WASM/RUST
 - [ ] Setup proper testing infrastructure
