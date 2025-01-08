@@ -27,6 +27,10 @@ initEnv = Env
 inMutuals :: [QName] -> C a -> C a
 inMutuals ds = local $ \e -> e
   { mutuals = reverse ds
+  -- NOTE(flupe):
+  --   *Maybe* this should also be bumped,
+  --   as fixpoints introduce locally-bound variables.
+  --   Probably doesn't matter since fixpoints are introduced before any other vars (for now).
   }
 
 inBoundVars :: Int -> C a -> C a
