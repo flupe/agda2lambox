@@ -11,9 +11,10 @@ Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
 
 - [x] Fix generation of Coq code
 - [x] Add Coq pretty-printing
-- [ ] Support mutual definitions
+- [x] Support mutual definitions
 - [ ] Support one-inductive
 - [ ] Support mutual inductives
+- [ ] Better error-reporting
 - [ ] "Support" modules
 - [ ] Support literals (ints and floats)
 - [ ] Setup compilation to WASM/RUST

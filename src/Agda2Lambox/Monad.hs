@@ -11,8 +11,10 @@ type C = ReaderT Env TCM
 runC0 :: C a -> TCM a
 runC0 m = runReaderT m initEnv
 
+-- | λ□ conversion environment.
 data Env = Env
   { mutuals   :: [QName]
+     -- ^ When we compile mutual definitions, they are introduced at the top of the local context.
   , boundVars :: Int
   }
 
@@ -24,7 +26,8 @@ initEnv = Env
 
 inMutuals :: [QName] -> C a -> C a
 inMutuals ds = local $ \e -> e
-  { mutuals = reverse ds }
+  { mutuals = reverse ds
+  }
 
 inBoundVars :: Int -> C a -> C a
 inBoundVars n = local $ \e -> e
