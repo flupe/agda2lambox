@@ -29,7 +29,6 @@ record = enclose
        . map \(k, v) -> text k <+> ":=" <+> v
   where enclose x = "{|" <+> x <+> "|}"
 
-
 pcoq :: Pretty (ToCoq a) => a -> Doc
 pcoq = pretty . ToCoq
 {-# INLINE pcoq #-}
@@ -61,6 +60,9 @@ instance Pretty (ToCoq Name) where
     case n of 
       Anon    -> ctor "nAnon"  []
       Named i -> ctor "nNamed" [pcoq i]
+
+instance Pretty (ToCoq Doc) where
+  pretty (ToCoq d) = d
 
 instance Pretty (ToCoq Term) where
   prettyPrec p (ToCoq v) =
@@ -148,3 +150,28 @@ instance Pretty (ToCoq t) => Pretty (ToCoq (Def t)) where
            , ("dbody", pcoq dBody)
            , ("rarg",  pcoq dArgs)
            ]
+
+-- | Generated module
+data CoqModule = CoqModule
+  { coqEnv      :: [(KerName, GlobalDecl)]
+  , coqPrograms :: [KerName]
+  }
+
+instance Pretty (ToCoq CoqModule) where
+  pretty (ToCoq CoqModule{..}) = vsep
+    [ vcat
+        [ "From MetaCoq.Common Require Import BasicAst Kernames Universes."
+        , "From MetaCoq.Erasure Require Import EAst."
+        , "From MetaCoq.Utils Require Import bytestring MCString."
+        , "From Coq Require Import List."
+        , ""
+        , "Import ListNotations."
+        , "Open Scope pair_scope."
+        , "Open Scope bs."
+        ]
+    , hang "Definition env : global_declarations :=" 2 $ pcoq coqEnv <> "."
+    , vsep $ flip map (zip [1..] coqPrograms) \(i :: Int, kn) ->
+        hang ("Definition prog" <> pretty i <> " : program :=") 2 $
+          pcoq (text "env" :: Doc, LConst kn) 
+          <> "."
+    ]

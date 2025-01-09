@@ -24,7 +24,7 @@ import Agda2Lambox.Convert ( convert )
 import Agda2Lambox.Convert.Function ( convertFunction )
 import Agda2Lambox.Convert.Data     ( convertDatatype )
 import Agda2Lambox.Monad ( runC0, inMutuals )
-import CoqGen ( ToCoq(ToCoq) )
+import CoqGen ( ToCoq(ToCoq), CoqModule(..) )
 import LambdaBox ( KerName, GlobalDecl, qnameToKerName )
 
 
@@ -105,9 +105,8 @@ writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
             -> [Maybe (KerName, GlobalDecl)]
             -> TCM ModuleRes
 writeModule opts menv _ m (reverse . catMaybes -> cdefs) = do
+  progs   <- liftIO $ readIORef $ modProgs menv
   compDir <- compileDir
-
-  liftIO $ print . ("Programs in module:" <>) . pp =<< readIORef (modProgs menv)
 
   let outDir   = fromMaybe compDir (optOutDir opts)
       fileName = (outDir </>) . moduleNameToFileName m
@@ -117,27 +116,6 @@ writeModule opts menv _ m (reverse . catMaybes -> cdefs) = do
   unless (null cdefs) $ liftIO do
     putStrLn $ "Writing " <> fileName ".v"
 
-    writeFile (fileName ".txt")
-      $ unlines (show <$> cdefs)
-
     writeFile (fileName ".v")
       $ (<> "\n")
-      $ coqModuleTemplate cdefs
-
-  where
-  coqModuleTemplate :: [(KerName, GlobalDecl)] -> String
-  coqModuleTemplate coqterms = unlines
-    [ "From MetaCoq.Common Require Import BasicAst Kernames Universes."
-    , "From MetaCoq.Erasure Require Import EAst."
-    , "From MetaCoq.Utils Require Import bytestring MCString."
-    , "From Coq Require Import List."
-
-    , ""
-    , "Import ListNotations."
-    , "Open Scope pair_scope."
-    , "Open Scope bs."
-    , ""
-    ] ++ coqDecls coqterms
-
-  coqDecls :: [(KerName, GlobalDecl)] -> String
-  coqDecls ds = pp $ "Definition env : global_declarations := " <?> (pretty (ToCoq ds) <> ".")
+      $ pp $ ToCoq $ CoqModule cdefs progs
