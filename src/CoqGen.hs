@@ -28,20 +28,23 @@ record :: [(String, Doc)] -> Doc
 record = enclose
        . fsep
        . punctuate semi
-       . map \(k, v) -> text k <+> ":=" <+> v
+       . map \(k, v) -> hang (text k <+> ":=") 2 v
   where enclose x = "{|" <+> x <+> "|}"
 
+-- | Shorthand to generate Coq from a value.
 pcoq :: Pretty (ToCoq a) => a -> Doc
 pcoq = pcoqP 0
 {-# INLINE pcoq #-}
 
+-- | Shorthand to generate Coq from a value, given precedence.
 pcoqP :: Pretty (ToCoq a) => Int -> a -> Doc
 pcoqP p = prettyPrec p . ToCoq
 {-# INLINE pcoqP #-}
 
 
 instance {-# OVERLAPPING #-} Pretty (ToCoq String) where
-  pretty (ToCoq s) = text $ show s
+  pretty (ToCoq s) = text (show s) <> "%bs"
+  -- NOTE(flupe): "%s" to make sure that we produce Coq bytestrings
 
 instance Pretty (ToCoq Int) where
   pretty = pretty . unwrap
@@ -168,12 +171,9 @@ instance Pretty (ToCoq CoqModule) where
     [ vcat
         [ "From MetaCoq.Common Require Import BasicAst Kernames Universes."
         , "From MetaCoq.Erasure Require Import EAst."
-        , "From MetaCoq.Utils Require Import bytestring MCString."
+        , "From MetaCoq.Utils Require Import bytestring."
         , "From Coq Require Import List."
-        , ""
         , "Import ListNotations."
-        , "Open Scope pair_scope."
-        , "Open Scope bs."
         ]
 
     , hang "Definition env : global_declarations :=" 2 $
