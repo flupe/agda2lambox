@@ -18,7 +18,7 @@ Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
 - [x] Support mutual definitions
 - [x] Support one-inductive
 - [x] Add pragma for program selection
-- [ ] Make pretty-printer prettier
+- [x] Make pretty-printer prettier
 - [ ] Ensure well-formedness of generated programs inside Coq
 - [ ] Evaluate λ□ programs from inside Coq to start testing
   - [ ] Possibly salvage an existing interpreter

@@ -7,31 +7,37 @@ import Data.List(intercalate)
 
 import Agda.Syntax.Common.Pretty
 import LambdaBox
-
-
--- TODO(flupe): conditionally insert parentheses
+import Agda.Utils.Function (applyWhen)
 
 
 -- | Wrapper for pretty-printing to Coq
 newtype ToCoq a = ToCoq { unwrap :: a }
 
-
 -- | Util to format Coq constructor with the given arguments.
 ctor :: String -> [Doc] -> Doc
-ctor name []   = text name
-ctor name args = parens $ hsep (text name : args)
+ctor = ctorP 0
+{-# INLINE ctor #-}
+
+-- | Util to format Coq constructor with the given arguments (and precedence).
+ctorP :: Int -> String -> [Doc] -> Doc
+ctorP p name []   = text name
+ctorP p name args = applyWhen (p >= 10) parens $ text name <?> fsep args
 
 -- | Util to format Coq record value with the given fields.
 record :: [(String, Doc)] -> Doc
 record = enclose
-       . sep
+       . fsep
        . punctuate semi
        . map \(k, v) -> text k <+> ":=" <+> v
   where enclose x = "{|" <+> x <+> "|}"
 
 pcoq :: Pretty (ToCoq a) => a -> Doc
-pcoq = pretty . ToCoq
+pcoq = pcoqP 0
 {-# INLINE pcoq #-}
+
+pcoqP :: Pretty (ToCoq a) => Int -> a -> Doc
+pcoqP p = prettyPrec p . ToCoq
+{-# INLINE pcoqP #-}
 
 
 instance {-# OVERLAPPING #-} Pretty (ToCoq String) where
@@ -44,16 +50,16 @@ instance Pretty (ToCoq Bool) where
   pretty (ToCoq v) = if v then "true" else "false"
 
 instance Pretty (ToCoq a) => Pretty (ToCoq (Maybe a)) where
-  pretty (ToCoq x) =
+  prettyPrec p (ToCoq x) =
     case x of
-      Nothing -> ctor "None" []
-      Just y  -> ctor "Some" [pcoq y]
+      Nothing -> ctorP p "None" []
+      Just y  -> ctorP p "Some" [pcoqP 10 y]
 
 instance Pretty (ToCoq a) => Pretty (ToCoq [a]) where
   pretty (ToCoq xs) = brackets $ fsep (punctuate ";" $ map pcoq xs)
 
 instance (Pretty (ToCoq a), Pretty (ToCoq b)) => Pretty (ToCoq (a, b)) where
-  pretty (ToCoq (a, b)) = parens $ (pcoq a <> comma) <+> pcoq b
+  pretty (ToCoq (a, b)) = parens $ fsep [pcoq a <> comma, pcoq b]
 
 instance Pretty (ToCoq Name) where
   pretty (ToCoq n) =
@@ -67,16 +73,16 @@ instance Pretty (ToCoq Doc) where
 instance Pretty (ToCoq Term) where
   prettyPrec p (ToCoq v) =
     case v of
-      LBox             -> ctor "tBox"       []
-      LRel k           -> ctor "tRel"       [pretty k]
-      LVar s           -> ctor "tVar"       [pretty s]
-      LLam t           -> ctor "tLambda"    [pcoq Anon, pcoq t]
-      LLet e t         -> ctor "tLetIn"     [pcoq Anon, pcoq e, pcoq t]
-      LApp u v         -> ctor "tApp"       [pcoq u, pcoq v]
-      LConst c         -> ctor "tConst"     [pcoq c]
-      LCtor ind i es   -> ctor "tConstruct" [pcoq ind, pcoq i, pcoq es]
-      LCase ind n t bs -> ctor "tCase"      [pcoq (ind, n), pcoq t, pcoq bs]
-      LFix mf i        -> ctor "tFix"       [pcoq mf, pcoq i]
+      LBox             -> ctorP p "tBox"       []
+      LRel k           -> ctorP p "tRel"       [pretty k]
+      LVar s           -> ctorP p "tVar"       [pretty s]
+      LLam t           -> ctorP p "tLambda"    [pcoq Anon, pcoqP 10 t]
+      LLet e t         -> ctorP p "tLetIn"     [pcoq Anon, pcoqP 10 e, pcoqP 10 t]
+      LApp u v         -> ctorP p "tApp"       [pcoqP 10 u, pcoqP 10 v]
+      LConst c         -> ctorP p "tConst"     [pcoqP 10 c]
+      LCtor ind i es   -> ctorP p "tConstruct" [pcoqP 10 ind, pcoqP 10 i, pcoqP 10 es]
+      LCase ind n t bs -> ctorP p "tCase"      [pcoqP 10 (ind, n), pcoqP 10 t, pcoqP 10 bs]
+      LFix mf i        -> ctorP p "tFix"       [pcoqP 10 mf, pcoqP 10 i]
 
 instance Pretty (ToCoq Inductive) where
   pretty (ToCoq Inductive{..}) =
@@ -85,11 +91,11 @@ instance Pretty (ToCoq Inductive) where
            ]
 
 instance Pretty (ToCoq ModPath) where
-  pretty (ToCoq p) =
-    case p of
-      MPFile dp       -> ctor "MPfile"  [pcoq dp]
-      MPBound dp id i -> ctor "MPbound" [pcoq dp, pcoq id, pcoq i]
-      MPDot mp id     -> ctor "MPdot"   [pcoq mp, pcoq id]
+  prettyPrec p (ToCoq mp) =
+    case mp of
+      MPFile dp       -> ctorP p "MPfile"  [pcoqP 10 dp]
+      MPBound dp id i -> ctorP p "MPbound" [pcoqP 10 dp, pcoqP 10 id, pcoqP 10 i]
+      MPDot mp id     -> ctorP p "MPdot"   [pcoqP 10 mp, pcoqP 10 id]
 
 instance Pretty (ToCoq KerName) where
   pretty (ToCoq KerName{..}) = pcoq (kerModPath, kerName)
@@ -137,12 +143,12 @@ instance Pretty (ToCoq MutualInductiveBody) where
            ]
 
 instance Pretty (ToCoq GlobalDecl) where
-  pretty (ToCoq decl) =
+  prettyPrec p (ToCoq decl) =
     case decl of
       ConstantDecl  body  ->
-        ctor "ConstantDecl" [record [("cst_body", pcoq body)]]
+        ctorP p "ConstantDecl"  [record [("cst_body", pcoq body)]]
       InductiveDecl minds ->
-        ctor "InductiveDecl" [pcoq minds]
+        ctorP p "InductiveDecl" [pcoqP 10 minds]
 
 instance Pretty (ToCoq t) => Pretty (ToCoq (Def t)) where
   pretty (ToCoq Def{..}) =
@@ -169,7 +175,10 @@ instance Pretty (ToCoq CoqModule) where
         , "Open Scope pair_scope."
         , "Open Scope bs."
         ]
-    , hang "Definition env : global_declarations :=" 2 $ pcoq coqEnv <> "."
+
+    , hang "Definition env : global_declarations :=" 2 $
+        pcoq coqEnv <> "."
+
     , vsep $ flip map (zip [1..] coqPrograms) \(i :: Int, kn) ->
         hang ("Definition prog" <> pretty i <> " : program :=") 2 $
           pcoq (text "env" :: Doc, LConst kn) 
