@@ -5,6 +5,7 @@ module Main where
 import Control.Monad ( unless )
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Control.DeepSeq ( NFData(..) )
+import Data.IORef ( IORef, newIORef, readIORef, modifyIORef' )
 import Data.Maybe ( fromMaybe, catMaybes, isJust, isNothing )
 import Data.Version ( showVersion )
 import GHC.Generics ( Generic )
@@ -17,7 +18,7 @@ import Paths_agda2lambox ( version )
 import Agda.Lib hiding ( (<?>), pretty )
 import Agda.Syntax.Common.Pretty ( (<?>), pretty )
 import Agda.Syntax.Common ( hasQuantityω )
-import Agda.Utils ( pp, unqual )
+import Agda.Utils ( pp, unqual, hasPragma )
 
 import Agda2Lambox.Convert ( convert )
 import Agda2Lambox.Convert.Function ( convertFunction )
@@ -42,7 +43,11 @@ defaultOptions :: Options
 defaultOptions = Options { optOutDir = Nothing }
 
 
-type ModuleEnv = ()
+data ModuleEnv = ModuleEnv 
+  { modProgs :: IORef [KerName]
+     -- ^ Names of programs to evaluate in a module
+  }
+
 type ModuleRes = ()
 
 backend :: Backend' Options Options ModuleEnv ModuleRes (Maybe (KerName, GlobalDecl))
@@ -69,11 +74,11 @@ moduleSetup :: Options -> IsMain -> TopLevelModuleName -> Maybe FilePath
             -> TCM (Recompile ModuleEnv ModuleRes)
 moduleSetup _ _ m _ = do
   setScope . iInsideScope =<< curIF
-  return $ Recompile ()
+  Recompile . ModuleEnv <$> liftIO (newIORef [])
 
 
 compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM (Maybe (KerName, GlobalDecl))
-compile opts tlm _ def@Defn{..} =
+compile opts menv _ def@Defn{..} =
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
 
@@ -83,7 +88,13 @@ compile opts tlm _ def@Defn{..} =
         , isNothing funExtLam        -- not a pattern-lambda-generated function   NOTE(flupe): ?
         , isNothing funWith          -- not a with-generated function             NOTE(flupe): ?
         , hasQuantityω def           -- non-erased
-        -> Just <$> runC0 (convertFunction def)
+        -> do
+          -- if the function is annotated with a COMPILE pragma
+          -- then it is added to the list of programs to run
+          whenM (hasPragma defName) $ 
+            liftIO $ modifyIORef' (modProgs menv) (qnameToKerName defName:)
+
+          Just <$> runC0 (convertFunction def)
 
       Datatype{} -> Just <$> runC0 (convertDatatype def)
 
@@ -93,8 +104,10 @@ compile opts tlm _ def@Defn{..} =
 writeModule :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
             -> [Maybe (KerName, GlobalDecl)]
             -> TCM ModuleRes
-writeModule opts _ _ m (reverse . catMaybes -> cdefs) = do
+writeModule opts menv _ m (reverse . catMaybes -> cdefs) = do
   compDir <- compileDir
+
+  liftIO $ print . ("Programs in module:" <>) . pp =<< readIORef (modProgs menv)
 
   let outDir   = fromMaybe compDir (optOutDir opts)
       fileName = (outDir </>) . moduleNameToFileName m

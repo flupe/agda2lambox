@@ -56,6 +56,9 @@ reportCurrentCtx = do
 unqual :: QName -> String
 unqual = pp . last . qnameToList0
 
+hasPragma :: QName -> TCM Bool
+hasPragma qn = isJust <$> getUniqueCompilerPragma "AGDA2LAMBOX" qn
+
 {-
 lookupCtx :: MonadTCEnv m => Int -> m (String, Type)
 lookupCtx i = first transcribe . (!! i) {-. reverse-} <$> currentCtx

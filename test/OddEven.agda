@@ -22,3 +22,7 @@ odd (succ n) = even n
 
 even zero = true
 even (succ n) = odd n
+
+test : Bool
+test = odd (succ (succ zero))
+{-# COMPILE AGDA2LAMBOX test #-}
