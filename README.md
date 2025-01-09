@@ -1,7 +1,11 @@
 # agda2lambox
 
-An Agda backend to generate MetaCoq LambdaBox code for further (certified) extraction to WASM or RUST.
-The backend builds upon Agda 2.7.0.1.
+An [Agda] backend to generate [MetaCoq] λ□ (LambdaBox) programs
+for further (verified) extraction to WASM or Rust.
+The backend builds off Agda 2.7.0.1.
+
+[Agda]: https://github.com/agda/agda
+[MetaCoq]: https://metacoq.github.io/
 
 ## Setup
 
@@ -13,15 +17,25 @@ Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
 - [x] Add Coq pretty-printing
 - [x] Support mutual definitions
 - [x] Support one-inductive
+- [ ] Make pretty-printer prettier
+- [ ] Ensure well-formedness of generated programs inside Coq
+- [ ] Add pragma for program selection
+- [ ] Evaluate λ□ programs from inside Coq to start testing
+  - [ ] Possibly salvage an existing interpreter
+  - [ ] Or implement our own...
 - [ ] Support mutual inductives
+- [ ] Support (one-inductive) records
+- [ ] Support mutual (possibly inductive) records
 - [ ] Better error-reporting
 - [ ] "Support" modules
 - [ ] Check support for Agda-specific edge cases
   - [ ] Pattern-matching lambdas
   - [ ] With-generated lambdas
   - [ ] Module applications
+  - [ ] Projection-like
 - [ ] Support literals (ints and floats)
-- [ ] Setup compilation to WASM/RUST
+- [ ] Setup compilation to Wasm/Rust using Certicoq
+  - [ ] May require generating λ□ terms for an older MetaCoq
 - [ ] Setup proper testing infrastructure
 
 ## References
@@ -29,7 +43,7 @@ Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
 - [The MetaCoq Project](https://github.com/MetaCoq/metacoq)
 - [The CertiCoq Compilation pipeline](https://github.com/CertiCoq/certicoq/wiki/The-CertiCoq-pipeline)
 - [CertiCoqWASM](https://github.com/womeier/certicoqwasm)
-- [Pierre Letouzey's thesis introducing LamndaBox](https://www.irif.fr/~letouzey/download/these_letouzey.pdf) (in French)
+- [Pierre Letouzey's thesis introducing λ□](https://www.irif.fr/~letouzey/download/these_letouzey.pdf) (in French)
 - [Verified Extraction from Coq to OCaml](https://github.com/yforster/coq-verified-extraction/)
   and its [accompanying paper](https://dl.acm.org/doi/10.1145/3656379)
 - [Certified Erasure for Coq, in Coq](https://inria.hal.science/hal-04077552)

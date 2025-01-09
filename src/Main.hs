@@ -15,22 +15,20 @@ import System.FilePath ( (</>) )
 import Paths_agda2lambox ( version )
 
 import Agda.Lib hiding ( (<?>), pretty )
-import Agda.Utils (pp, unqual)
+import Agda.Syntax.Common.Pretty ( (<?>), pretty )
+import Agda.Syntax.Common ( hasQuantityω )
+import Agda.Utils ( pp, unqual )
 
-import LambdaBox
-import qualified LambdaBox as L
 import Agda2Lambox.Convert ( convert )
 import Agda2Lambox.Convert.Function ( convertFunction )
 import Agda2Lambox.Convert.Data     ( convertDatatype )
 import Agda2Lambox.Monad ( runC0, inMutuals )
 import CoqGen ( ToCoq(ToCoq) )
-import Agda.Syntax.Common.Pretty ( (<?>), pretty )
-import Agda.Syntax.Common (hasQuantityω)
+import LambdaBox ( KerName, GlobalDecl, qnameToKerName )
 
 
 main :: IO ()
 main = runAgda [Backend backend]
-
 
 -- | LambdaBox backend options.
 data Options = Options { optOutDir :: Maybe FilePath }
@@ -46,25 +44,6 @@ defaultOptions = Options { optOutDir = Nothing }
 
 type ModuleEnv = ()
 type ModuleRes = ()
-
-data CompiledDef = CompiledDef
-  { name  :: QName
-  , tterm :: TTerm
-  , ltype :: L.Type 
-  , lterm :: L.Term
-  }
-
-instance Show CompiledDef where
-  show CompiledDef{..} =
-    let pre  = pp (qnameName name) <> " = " in
-    let preT = pp (qnameName name) <> " : " in  
-    unlines [ "=== SOURCE ==="
-            , pre  <> pp tterm
-            , "=== COMPILED ==="
-            , preT <> pp ltype
-            , pre  <> pp lterm
-            -- , pre <> term2Coq lterm
-            ]
 
 backend :: Backend' Options Options ModuleEnv ModuleRes (Maybe (KerName, GlobalDecl))
 backend = Backend'
@@ -91,6 +70,7 @@ moduleSetup :: Options -> IsMain -> TopLevelModuleName -> Maybe FilePath
 moduleSetup _ _ m _ = do
   setScope . iInsideScope =<< curIF
   return $ Recompile ()
+
 
 compile :: Options -> ModuleEnv -> IsMain -> Definition -> TCM (Maybe (KerName, GlobalDecl))
 compile opts tlm _ def@Defn{..} =

@@ -1,5 +1,12 @@
 data Bool : Set where true false : Bool
 
+not : Bool -> Bool
+not true  = false
+not false = true
+
+notnot : Bool → Bool
+notnot b = not (not b)
+
 data Nat : Set where
   zero : Nat
   succ : Nat -> Nat

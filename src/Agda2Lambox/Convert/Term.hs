@@ -29,10 +29,8 @@ instance A.TTerm ~> L.Term where
     A.TDef qn -> do
       Env{..} <- ask
       return case qn `elemIndex` mutuals of
-        Nothing -> LVar (unqual qn)
-        Just i  -> LRel (i + boundVars) -- NOTE(flupe): this looks fishy
-                                         --              this isn't a (locally-bound) var
-                                         --              but a constant?
+        Nothing -> LConst $ qnameToKerName qn
+        Just i  -> LRel   $ i + boundVars
     A.TApp t args -> do
       ct    <- go t
       cargs <- mapM go args
