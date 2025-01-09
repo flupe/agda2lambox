@@ -1,7 +1,5 @@
 name: "Nix CI"
-on:
-  pull_request:
-  push:
+on: [pull_request, push, workflow_dispatch]
 jobs:
   nix-build:
     name: ${{ matrix.pretty }} with nix (${{ matrix.derivation }})
