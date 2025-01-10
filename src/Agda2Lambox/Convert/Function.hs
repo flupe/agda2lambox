@@ -7,11 +7,12 @@ module Agda2Lambox.Convert.Function
 import Control.Monad.Reader ( ask, liftIO )
 import Control.Monad ( forM )
 import Data.List ( elemIndex )
+import Data.Maybe ( isNothing, isJust )
 
 import Utils
 
 import Agda ( liftTCM )
-import Agda.Lib ()
+import Agda.Lib ( (^.), funInline )
 import Agda.Utils
 import Agda.Syntax.Abstract.Name ( qnameModule )
 import Agda.TypeChecking.Monad.Base
@@ -20,6 +21,7 @@ import Agda.Compiler.ToTreeless ( toTreeless )
 import Agda.Compiler.Backend ( getConstInfo )
 import Agda.Syntax.Treeless ( EvaluationStrategy(EagerEvaluation) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
+import Agda.Syntax.Common ( hasQuantityω )
 
 import LambdaBox
 
@@ -40,14 +42,29 @@ convertFunctionBody Defn{defName} =
     Just t <- liftTCM $ toTreeless EagerEvaluation defName
     convert t
 
+-- | Whether a function is a (true) record projection.
+isProjection :: Either ProjectionLikenessMissing Projection -> Bool
+isProjection (Left _) = False
+isProjection (Right Projection{projProper}) = isJust projProper
+
+-- | Whether to compile a function definition to λ□.
+shouldCompileFunction :: Definition -> Bool
+shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
+  = not (theDef ^. funInline)           -- not inlined (from module application)
+    && isNothing funExtLam              -- not a pattern-lambda-generated function   NOTE(flupe): ?
+    && isNothing funWith                -- not a with-generated function             NOTE(flupe): ?
+    && not (isProjection funProjection) -- not a record projection
+    && hasQuantityω def                 -- non-erased
+
 -- | Convert a function definition to a λ□ declaration.
-convertFunction :: Definition :~> GlobalDecl
+convertFunction :: Definition :~> Maybe GlobalDecl
+convertFunction defn | not (shouldCompileFunction defn) = return Nothing
 convertFunction defn@Defn{defName, theDef} =
   withCurrentModule (qnameModule defName) do
     let Function{funMutual = Just ms} = theDef
 
     if null ms then 
-      ConstantDecl . Just <$> convertFunctionBody defn
+      Just. ConstantDecl . Just <$> convertFunctionBody defn
     else do
       mdefs :: [Definition] <- mapM getConstInfo ms
 
@@ -59,7 +76,7 @@ convertFunction defn@Defn{defName, theDef} =
         --   it's unclear in which order mutual fixpoints are added to the local context
         let Just k = elemIndex defName ms
 
-        ConstantDecl . Just . flip LFix k <$>
+        Just . ConstantDecl . Just . flip LFix k <$>
           forM mdefs \def@Defn{defName} -> do
             body <- convertFunctionBody def
             return Def

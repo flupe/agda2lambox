@@ -23,10 +23,8 @@ data Inductive = Inductive
       -- ^ Which of those is the inductive we care about.
   } deriving (Eq, Show)
 
-
 data Name = Anon | Named Ident
   deriving (Eq, Show)
-
 
 type DirPath = [Ident]
 

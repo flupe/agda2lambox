@@ -26,3 +26,9 @@ even (succ n) = odd n
 test : Bool
 test = odd (succ (succ zero))
 {-# COMPILE AGDA2LAMBOX test #-}
+
+record Pair (A : Set) (B : Set) : Set where
+  constructor _,_
+  field
+    fst : A
+    snd : B

@@ -17,12 +17,12 @@ import Paths_agda2lambox ( version )
 
 import Agda.Lib hiding ( (<?>), pretty )
 import Agda.Syntax.Common.Pretty ( (<?>), pretty )
-import Agda.Syntax.Common ( hasQuantityω )
 import Agda.Utils ( pp, unqual, hasPragma )
 
 import Agda2Lambox.Convert ( convert )
 import Agda2Lambox.Convert.Function ( convertFunction )
 import Agda2Lambox.Convert.Data     ( convertDatatype )
+import Agda2Lambox.Convert.Record   ( convertRecord   )
 import Agda2Lambox.Monad ( runC0, inMutuals )
 import CoqGen ( ToCoq(ToCoq), CoqModule(..) )
 import LambdaBox ( KerName, GlobalDecl, qnameToKerName )
@@ -82,21 +82,17 @@ compile opts menv _ def@Defn{..} =
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
 
-      -- TODO(flupe): offload the check to Convert.Function
-      Function{..}
-        | not (theDef ^. funInline)  -- not inlined (from module application)
-        , isNothing funExtLam        -- not a pattern-lambda-generated function   NOTE(flupe): ?
-        , isNothing funWith          -- not a with-generated function             NOTE(flupe): ?
-        , hasQuantityω def           -- non-erased
-        -> do
+      Function{} -> do
           -- if the function is annotated with a COMPILE pragma
           -- then it is added to the list of programs to run
           whenM (hasPragma defName) $ 
             liftIO $ modifyIORef' (modProgs menv) (qnameToKerName defName:)
 
-          Just <$> runC0 (convertFunction def)
+          runC0 (convertFunction def)
 
       Datatype{} -> Just <$> runC0 (convertDatatype def)
+
+      Record{}   -> Just <$> runC0 (convertRecord def)
 
       _          -> Nothing <$ (liftIO $ putStrLn $ "Skipping " <> prettyShow defName)
 

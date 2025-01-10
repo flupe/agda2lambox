@@ -23,6 +23,7 @@ executable agda2lambox
                        Agda2Lambox.Convert.Class,
                        Agda2Lambox.Convert.Data,
                        Agda2Lambox.Convert.Function,
+                       Agda2Lambox.Convert.Record,
                        Agda2Lambox.Convert.Term,
                        Agda2Lambox,
                        Utils,
