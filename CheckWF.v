@@ -7,7 +7,6 @@ From Equations       Require Import Equations.
 Import ListNotations.
 Import EnvMap.
 
-
 #[global] Obligation Tactic := idtac.
 #[global] Set Equations Transparent.
 #[global] Set Equations With UIP.
@@ -22,36 +21,24 @@ Definition dec_fresh_global
   : decidable (fresh_global k decls).
 Admitted.
 
-Equations dec_wf_glob {efl : EEnvFlags} (decls : global_declarations)
+#[local] Obligation Tactic :=
+          try intro wf_decls;
+          try dependent elimination wf_decls;
+          try auto.
+
+Equations? dec_wf_glob {efl : EEnvFlags} (decls : global_declarations)
   : decidable (wf_glob decls) :=
 dec_wf_glob [] := or_introl wf_glob_nil;
 dec_wf_glob ((k,d)::ds) with dec_wf_glob ds := {
   | or_introl wf_ds with inspect (wf_global_decl ds d), dec_fresh_global k ds := {
-      | true  eqn: wf_d | or_introl fresh_k  := or_introl (wf_glob_cons k d ds wf_ds wf_d fresh_k);
-      | true  eqn: wf_d | or_intror rotten_k := or_intror _;
-      | false eqn: wf_d | _                  := or_intror _;
+      | true  eqn:     wf_d | or_introl fresh_k  := or_introl _;
+      | true  eqn:     wf_d | or_intror rotten_k := or_intror _;
+      | false eqn: not_wf_d | _                  := or_intror _;
     };
-  | or_intror p := or_intror _
+  | or_intror not_wf_ds := or_intror _
 }.
-Next Obligation.
-  intros dec_wf_glob efl k d ds fresh_k not_wf_d _ _ wf_decls.
-  dependent elimination wf_decls.
-  simpl in not_wf_d.
+- apply wf_glob_cons; auto.
+- simpl in not_wf_d.
   rewrite not_wf_d in i.
-  discriminate i.
-Qed.
-Next Obligation.
-  intros dec_wf_glob efl k d ds rotten_k _ _ wf_decls.
-  dependent elimination wf_decls.
-  apply (rotten_k f).
-Qed.
-Next Obligation.
-  intros dec_wf_glob efl k d ds rotten_k _ _ _ wf_decls.
-  dependent elimination wf_decls.
-  apply (rotten_k f).
-Qed.
-Next Obligation.
-  intros dec_wf_glob efl k d ds  not_wf_ds wf_decls.
-  dependent elimination wf_decls.
-  apply (not_wf_ds w).
+  auto.
 Defined.
