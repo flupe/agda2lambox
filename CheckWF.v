@@ -1,62 +1,57 @@
-From Coq Require Import List.
-From Coq Require Import Logic.Decidable.
-From Coq Require Import Program.Equality.
-From MetaCoq.Common Require Import BasicAst Kernames Universes EnvMap.
+From Coq             Require Import List Logic.Decidable.
+From MetaCoq.Common  Require Import BasicAst Kernames Universes EnvMap.
 From MetaCoq.Erasure Require Import EAst EWellformed.
-From MetaCoq.Utils Require Import bytestring.
+From MetaCoq.Utils   Require Import bytestring.
+From Equations       Require Import Equations.
 
 Import ListNotations.
 Import EnvMap.
 
 
-(* Freshness of kername in the environment is decidable *)
-Fixpoint dec_fresh_global
+#[global] Obligation Tactic := idtac.
+#[global] Set Equations Transparent.
+#[global] Set Equations With UIP.
+
+Definition inspect {A} (a : A) : {b | a = b} := exist _ a eq_refl.
+Notation "x 'eqn:' p" := (exist _ x p) (only parsing, at level 20).
+
+(* TODO: Freshness of kername in the environment is decidable *)
+Definition dec_fresh_global
   (k     : kername)
   (decls : global_declarations)
   : decidable (fresh_global k decls).
-  destruct decls.
-(*
-  - left.
-    apply Forall_nil.
-  - pose proof (dec_fresh_global k decls).
-    remember (Kername.eq_dec (fst p) k) as peqk.
-    destruct H.
-    + left. refine (Forall_cons p _ H).
-*)
 Admitted.
 
-(* Well-formedness of global declarations is decidable *)
-Fixpoint dec_wf_glob
-  {efl   : EEnvFlags}
-  (decls : global_declarations)
-  : decidable (wf_glob decls).
-  destruct decls.
-  - left.
-    apply wf_glob_nil.
-  - destruct (dec_wf_glob efl decls).
-    +  destruct p.
-       remember (wf_global_decl decls g)   as wf_g.
-       remember (dec_fresh_global k decls) as fresh_k.
-       destruct wf_g.
-       destruct fresh_k.
-       left.
-       apply (wf_glob_cons k g decls H).
-       rewrite <- Heqwf_g.
-       auto.
-       auto.
-       right.
-       intro.
-       dependent destruction H0.
-       auto.
-       right.
-       intro.
-       dependent destruction H0.
-       rewrite <- Heqwf_g in H1.
-       unfold is_true in H1.
-       discriminate H1.
-    + right.
-      intro wf_glob_decls.
-      dependent destruction wf_glob_decls.
-      contradiction.
+Equations dec_wf_glob {efl : EEnvFlags} (decls : global_declarations)
+  : decidable (wf_glob decls) :=
+dec_wf_glob [] := or_introl wf_glob_nil;
+dec_wf_glob ((k,d)::ds) with dec_wf_glob ds := {
+  | or_introl wf_ds with inspect (wf_global_decl ds d), dec_fresh_global k ds := {
+      | true  eqn: wf_d | or_introl fresh_k  := or_introl (wf_glob_cons k d ds wf_ds wf_d fresh_k);
+      | true  eqn: wf_d | or_intror rotten_k := or_intror _;
+      | false eqn: wf_d | _                  := or_intror _;
+    };
+  | or_intror p := or_intror _
+}.
+Next Obligation.
+  intros dec_wf_glob efl k d ds fresh_k not_wf_d _ _ wf_decls.
+  dependent elimination wf_decls.
+  simpl in not_wf_d.
+  rewrite not_wf_d in i.
+  discriminate i.
+Qed.
+Next Obligation.
+  intros dec_wf_glob efl k d ds rotten_k _ _ wf_decls.
+  dependent elimination wf_decls.
+  apply (rotten_k f).
+Qed.
+Next Obligation.
+  intros dec_wf_glob efl k d ds rotten_k _ _ _ wf_decls.
+  dependent elimination wf_decls.
+  apply (rotten_k f).
+Qed.
+Next Obligation.
+  intros dec_wf_glob efl k d ds  not_wf_ds wf_decls.
+  dependent elimination wf_decls.
+  apply (not_wf_ds w).
 Defined.
-
