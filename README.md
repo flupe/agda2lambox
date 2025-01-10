@@ -19,12 +19,14 @@ Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
 - [x] Support one-inductive
 - [x] Add pragma for program selection
 - [x] Make pretty-printer prettier
-- [ ] Ensure well-formedness of generated programs inside Coq
+- [x] Ensure well-formedness of generated programs inside Coq
+  - [ ] Make well-formedness check faster by splitting it into boolean and propositional.
 - [ ] Evaluate λ□ programs from inside Coq to start testing
   - [ ] Possibly salvage an existing interpreter
   - [ ] Or implement our own...
 - [ ] Support mutual inductives
-- [ ] Support (one-inductive) records
+- [x] Support (one-inductive) records
+  - [ ] Properly translate projections in terms.
 - [ ] Support mutual (possibly inductive) records
 - [ ] Better error-reporting
 - [ ] "Support" modules
