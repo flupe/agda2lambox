@@ -14,9 +14,6 @@ Import EnvMap.
 Definition inspect {A} (a : A) : {b | a = b} := exist _ a eq_refl.
 Notation "x 'eqn:' p" := (exist _ x p) (only parsing, at level 20).
 
-Print Forall.
-Print fresh_global.
-
 #[local] Obligation Tactic :=
           try intro wf_decls;
           try dependent elimination wf_decls;
@@ -49,3 +46,20 @@ dec_wf_glob ((k, d)::ds) with dec_wf_glob ds := {
   rewrite not_wf_d in i.
   auto.
 Defined.
+
+Equations wf_program {efl : EEnvFlags} (p : program) : Prop :=
+wf_program (decls , t) := wf_glob decls /\ is_true (wellformed decls 0 t).
+
+Equations? dec_wf_program {efl : EEnvFlags} (p : program) : decidable (wf_program p) :=
+dec_wf_program (decls, t) with dec_wf_glob decls := {
+  | or_introl wf_glob_decls with inspect (wellformed decls 0 t) := {
+      | true  eqn: wf_t := or_introl _;
+      | false eqn: wf_t := or_intror _;
+    };
+  | or_intror _ := or_intror _;
+}.
+- rewrite wf_t in i.
+  discriminate i.
+Defined.
+
+Definition eflags : EEnvFlags := all_env_flags.

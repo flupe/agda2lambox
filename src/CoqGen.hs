@@ -169,18 +169,21 @@ data CoqModule = CoqModule
 instance Pretty (ToCoq CoqModule) where
   pretty (ToCoq CoqModule{..}) = vsep
     [ vcat
-        [ "From MetaCoq.Common Require Import BasicAst Kernames Universes."
+        [ "From Coq             Require Import List."
+        , "From MetaCoq.Common  Require Import BasicAst Kernames Universes."
+        , "From MetaCoq.Utils   Require Import bytestring."
         , "From MetaCoq.Erasure Require Import EAst."
-        , "From MetaCoq.Utils Require Import bytestring."
-        , "From Coq Require Import List."
+        , "From Agda2Lambox     Require Import CheckWF."
         , "Import ListNotations."
         ]
 
     , hang "Definition env : global_declarations :=" 2 $
         pcoq coqEnv <> "."
 
-    , vsep $ flip map (zip [1..] coqPrograms) \(i :: Int, kn) ->
-        hang ("Definition prog" <> pretty i <> " : program :=") 2 $
-          pcoq (text "env" :: Doc, LConst kn) 
-          <> "."
+    , vsep $ flip map (zip [1..] coqPrograms) \(i :: Int, kn) -> vsep
+        [ hang ("Definition prog" <> pretty i <> " : program :=") 2 $
+            pcoq (text "env" :: Doc, LConst kn) 
+            <> "."
+        , "Compute @dec_wf_program eflags prog" <> pretty i <> "."
+        ]
     ]

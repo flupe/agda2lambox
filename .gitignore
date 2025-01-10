@@ -4,6 +4,15 @@ dist
 dist-newstyle
 *~
 *.agdai
+*.vo
+*.vok
+*.vos
+*.glob
+*.aux
+CoqMakefile
+CoqMakefile.conf
+*.d
+
 
 .direnv
 result

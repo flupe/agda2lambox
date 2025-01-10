@@ -1,0 +1,3 @@
+-R theories Agda2Lambox
+-R build Build
+theories/CheckWF.v
