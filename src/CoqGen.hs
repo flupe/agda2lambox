@@ -180,10 +180,11 @@ instance Pretty (ToCoq CoqModule) where
     , hang "Definition env : global_declarations :=" 2 $
         pcoq coqEnv <> "."
 
+    , "Compute @check_wf_glob eflags env."
+
     , vsep $ flip map (zip [1..] coqPrograms) \(i :: Int, kn) -> vsep
         [ hang ("Definition prog" <> pretty i <> " : program :=") 2 $
             pcoq (text "env" :: Doc, LConst kn) 
             <> "."
-        , "Compute @dec_wf_program eflags prog" <> pretty i <> "."
         ]
     ]

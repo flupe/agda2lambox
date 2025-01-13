@@ -1,11 +1,12 @@
-From Coq             Require Import List Logic.Decidable.
+From Coq             Require Import List Logic.Decidable ssreflect.
 From MetaCoq.Common  Require Import BasicAst Kernames Universes EnvMap.
 From MetaCoq.Erasure Require Import EAst EWellformed.
-From MetaCoq.Utils   Require Import bytestring.
+From MetaCoq.Utils   Require Import bytestring ReflectEq.
 From Equations       Require Import Equations.
 
 Import ListNotations.
 Import EnvMap.
+Import Kernames.
 
 #[global] Obligation Tactic := idtac.
 #[global] Set Equations Transparent.
@@ -14,10 +15,125 @@ Import EnvMap.
 Definition inspect {A} (a : A) : {b | a = b} := exist _ a eq_refl.
 Notation "x 'eqn:' p" := (exist _ x p) (only parsing, at level 20).
 
+(*
 #[local] Obligation Tactic :=
+          try simpl;
           try intro wf_decls;
           try dependent elimination wf_decls;
           try auto.
+*)
+
+Definition eflags : EEnvFlags := all_env_flags.
+
+Fixpoint check_fresh_global (k : kername) (decls : global_declarations) : bool :=
+  match decls with
+  | []    => true
+  | p::ds => negb (eq_kername (fst p) k) && check_fresh_global k ds
+  end.
+
+Fixpoint check_wf_glob {efl : EEnvFlags} (decls : global_declarations) : bool :=
+  match decls with
+  | []    => true
+  | p::ds => check_wf_glob ds && check_fresh_global (fst p) ds && wf_global_decl ds (snd p)
+  end.
+
+Definition check_wf_program {efl : EEnvFlags} (p : program) : bool :=
+  check_wf_glob (fst p) && wellformed (fst p) 0 (snd p).
+
+(* freshness boolean check coincides with the freshness property *)
+Fixpoint check_fresh_globalP (k : kername) (decls : global_declarations)
+  : reflectProp (fresh_global k decls) (check_fresh_global k decls).
+dependent elimination decls; simpl.
+Proof.
+- apply reflectP.
+  apply Forall_nil.
+- destruct (inspect (fst p == k)).
+  destruct x.
+  + rewrite e.
+    simpl.
+    apply reflectF.
+    intro global_ds.
+    dependent elimination global_ds.
+    apply n.
+    apply eqb_eq.
+    auto.
+  + rewrite e.
+    simpl.
+    destruct (check_fresh_globalP k l).
+    * apply reflectP.
+      apply Forall_cons.
+      destruct (neqb (fst p) k).
+      apply H0.
+      rewrite e.
+      simpl.
+      auto.
+      auto.
+    * apply reflectF.
+      intro gds.
+      dependent elimination gds.
+      auto.
+Defined.
+
+(* well-formedness boolean check coincides with the wf property *)
+Fixpoint check_wf_globP {efl : EEnvFlags} (decls : global_declarations)
+  : reflectProp (wf_glob decls) (check_wf_glob decls).
+Proof.
+dependent elimination decls.
+- apply reflectP.
+  apply wf_glob_nil.
+- remember (check_wf_glob l).
+  pose x := (check_wf_globP efl l).
+  rewrite <-Heqb in x.
+  destruct x.
+  + simpl.
+    rewrite <-Heqb.
+    simpl.
+    remember (check_fresh_global (fst p) l).
+    pose x := (check_fresh_globalP (fst p) l).
+    rewrite <-Heqb0 in x.
+    destruct x.
+    simpl.
+    remember (wf_global_decl l (snd p)).
+    destruct b.
+    apply reflectP.
+    destruct p.
+    apply wf_glob_cons; auto.
+    apply reflectF.
+    intro gds.
+    dependent elimination gds.
+    simpl in Heqb1.
+    rewrite <-Heqb1 in i.
+    discriminate i.
+    simpl.
+    apply reflectF.
+    intro gds.
+    dependent elimination gds.
+    auto.
+  + simpl.
+    rewrite <- Heqb.
+    simpl.
+    apply reflectF.
+    intro gds.
+    dependent elimination gds.
+    auto.
+Defined.
+
+(*
+
+check_fresh_globalP k [] := _;
+check_fresh_globalP k ((k', _)::ds) with inspect (eq_kername k' k), inspect (check_fresh_global k ds) := {
+ | false eqn: p | true eqn: q := _;
+ | _     eqn: p | _    eqn: q := _
+}.
+- apply ReflectT.
+  apply Forall_nil.
+- rewrite q.
+  rewrite p.
+  simpl.
+  apply ReflectT.
+  apply Forall_cons.
+  + .
+  
 
 Equations? dec_fresh_global (k : kername) (decls : global_declarations) : decidable (fresh_global k decls) :=
 dec_fresh_global k [] := or_introl (Forall_nil _);
@@ -62,4 +178,5 @@ dec_wf_program (decls, t) with dec_wf_glob decls := {
   discriminate i.
 Defined.
 
-Definition eflags : EEnvFlags := all_env_flags.
+
+*)
