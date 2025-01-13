@@ -13,6 +13,8 @@ import Agda.Utils
 import Agda.Syntax.Literal
 import Agda.Syntax.Abstract.Name ( QName(..), ModuleName(..) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
+import Agda.TypeChecking.Primitive.Base ( getBuiltinName )
+import Agda.Compiler.Backend ( builtinNat, builtinZero, builtinSuc )
 
 import LambdaBox
 import qualified LambdaBox as L
@@ -50,7 +52,7 @@ instance A.TTerm ~> L.Term where
         A.Erased _    -> fail "Erased matches are not supported."
         A.NotErased _ -> do
           calts <- traverse go talts
-          cind <- go caseType
+          cind  <- go caseType
           return $ LCase cind 0 (LRel n) calts
     A.TUnit -> return LBox
     A.TSort -> return LBox
@@ -68,12 +70,25 @@ instance A.CaseType ~> L.Inductive where
   go = \case
     A.CTData qn -> return $ L.Inductive (qnameToKerName qn) 0 
                    -- TODO(flupe): handle mutual inductive
+
+    -- Builtin Nat
+    A.CTNat -> do
+      liftTCM (getBuiltinName builtinNat) >>= \case
+        Nothing -> fail "Builtin Nat not bound."
+        Just qn -> return $ L.Inductive (qnameToKerName qn) 0
+
     _           -> fail "Not supported case type"
 
 -- TODO(flupe): handle using MetaCoq tPrim and prim_val
 instance A.Literal ~> L.Term where
   go = \case
-    LitNat    n -> fail "Literal natural numbers not supported"
+    LitNat n -> do
+      Just qnat  <- liftTCM $ getBuiltinName builtinNat
+
+      let indnat = L.Inductive (qnameToKerName qnat) 0
+
+      return $ (!! fromInteger n) $ iterate (LApp (LCtor indnat 1 [])) (LCtor indnat 0 [])
+
     LitWord64 w -> fail "Literal int64 not supported"
     LitFloat  f -> fail "Literal float not supported"
     LitString s -> fail "Literal string not supported"

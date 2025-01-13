@@ -9,7 +9,15 @@ The backend builds off Agda 2.7.0.1.
 
 ## Setup
 
-Compatible with Coq 8.20.0 and MetaCoq 1.3.2.
+Compatible with Coq 8.19.0, MetaCoq 1.3.1 and CertiCoq 0.9.
+
+```
+opam pin add coq 8.19.0
+opam pin add certicoq 0.9+8.19
+coq_makefile -f _CoqProject -o CoqMakefile
+make -f CoqMakefile
+cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
+```
 
 ## TODO
 
