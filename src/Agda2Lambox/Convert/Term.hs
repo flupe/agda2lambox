@@ -22,6 +22,10 @@ import qualified LambdaBox as L
 import Agda2Lambox.Monad
 import Agda2Lambox.Convert.Class
 
+-- quick fix, remove this asap
+app :: L.Term -> L.Term -> L.Term
+app (LCtor ind k es) arg = LCtor ind k (es ++ [arg])
+app t arg                = LApp t arg
 
 -- | Compiling (treeless) Agda terms into Lambox expressions.
 instance A.TTerm ~> L.Term where
@@ -36,7 +40,7 @@ instance A.TTerm ~> L.Term where
     A.TApp t args -> do
       ct    <- go t
       cargs <- mapM go args
-      return $ foldl LApp ct cargs
+      return $ foldl app ct cargs
     A.TLam t -> inBoundVar $ LLam <$> go t
     A.TLit l -> go l
     A.TCon qn -> do
@@ -87,7 +91,7 @@ instance A.Literal ~> L.Term where
 
       let indnat = L.Inductive (qnameToKerName qnat) 0
 
-      return $ (!! fromInteger n) $ iterate (LApp (LCtor indnat 1 [])) (LCtor indnat 0 [])
+      return $ (!! fromInteger n) $ iterate (app (LCtor indnat 1 [])) (LCtor indnat 0 [])
 
     LitWord64 w -> fail "Literal int64 not supported"
     LitFloat  f -> fail "Literal float not supported"

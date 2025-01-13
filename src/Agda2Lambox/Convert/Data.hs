@@ -59,9 +59,6 @@ convertDatatype defn@Defn{defName, theDef} =
           -- NOTE(flupe): Agda's datatypes are *always* finite?
           -- Co-induction is restricted to records.
           -- We may want to set BiFinite for non-recursive datatypes, but I don't know yet.
-      , indPars   = dataPars
-          -- TODO(flupe):
-          --   ^ double-check, but I don't think we'll ever share parameters.
-          --     unless, perhaps, when defined inside a parametrized module (?).
+      , indPars   = 0
       , indBodies = [inductive]
       }

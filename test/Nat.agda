@@ -1,16 +1,18 @@
 data Nat : Set where
   zero : Nat
   succ : Nat → Nat
-{-# BUILTIN NATURAL Nat #-}
+
+one : Nat
+one = succ zero
 
 add : Nat → Nat → Nat
 add zero y = y
 add (succ x) y = succ (add x y)
 
-prog : Nat
-prog = add 3 2
-{-# COMPILE AGDA2LAMBOX prog #-}
+deux trois : Nat
+deux  = succ (succ zero)
+trois = succ (succ (succ zero))
 
--- 5
-res : Nat
-res = 5
+prog : Nat
+prog = add trois deux
+{-# COMPILE AGDA2LAMBOX prog #-}

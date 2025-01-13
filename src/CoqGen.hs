@@ -173,7 +173,7 @@ instance Pretty (ToCoq CoqModule) where
         , "From MetaCoq.Common  Require Import BasicAst Kernames Universes."
         , "From MetaCoq.Utils   Require Import bytestring."
         , "From MetaCoq.Erasure Require Import EAst."
-        , "From Agda2Lambox     Require Import CheckWF."
+        , "From Agda2Lambox     Require Import CheckWF Eval."
         , "Import ListNotations."
         ]
 
@@ -182,9 +182,11 @@ instance Pretty (ToCoq CoqModule) where
 
     , "Compute @check_wf_glob eflags env."
 
-    , vsep $ flip map (zip [1..] coqPrograms) \(i :: Int, kn) -> vsep
-        [ hang ("Definition prog" <> pretty i <> " : program :=") 2 $
+    , vsep $ flip map (zip [1..] $ reverse coqPrograms) \(i :: Int, kn) -> 
+        let progname = "prog" <> pretty i in vsep
+        [ hang ("Definition " <> progname <> " : program :=") 2 $
             pcoq (text "env" :: Doc, LConst kn) 
             <> "."
+        , "Compute eval_program " <> progname <> "."
         ]
     ]

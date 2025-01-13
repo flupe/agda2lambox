@@ -12,7 +12,6 @@ The backend builds off Agda 2.7.0.1.
 Compatible with Coq 8.19.0, MetaCoq 1.3.1 and CertiCoq 0.9.
 
 ```
-opam pin add coq 8.19.0
 opam pin add certicoq 0.9+8.19
 coq_makefile -f _CoqProject -o CoqMakefile
 make -f CoqMakefile
@@ -29,9 +28,8 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 - [x] Make pretty-printer prettier
 - [x] Ensure well-formedness of generated programs inside Coq
   - [x] Make well-formedness check faster by splitting it into boolean and propositional.
-- [ ] Evaluate λ□ programs from inside Coq to start testing
-  - [ ] Possibly salvage an existing interpreter
-  - [ ] Or implement our own...
+- [x] Evaluate λ□ programs from inside Coq to start testing
+  - [x] Using the λ□-Mut from CertiCoq
 - [ ] Support mutual inductives
 - [x] Support (one-inductive) records
   - [ ] Properly translate projections in terms.
