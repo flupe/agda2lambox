@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, BangPatterns #-}
 
 -- | Agda utilities.
 module Agda.Utils where
@@ -11,9 +11,12 @@ import Control.Arrow ( first )
 import Data.List ( partition )
 import qualified Data.List.NonEmpty as NE ( fromList )
 import Data.Maybe ( isJust, isNothing )
+import Data.Bifunctor ( second )
 
 import Utils
 import Agda.Lib
+import Agda.TypeChecking.Free.Lazy (underBinder)
+import Agda.TypeChecking.Datatypes (getConstructorInfo, ConstructorInfo(..))
 
 -- ** useful monad constraint kinds
 
@@ -58,6 +61,58 @@ unqual = pp . last . qnameToList0
 
 hasPragma :: QName -> TCM Bool
 hasPragma qn = isJust <$> getUniqueCompilerPragma "AGDA2LAMBOX" qn
+
+
+-- ** eta-expansion of constructors
+
+-- NOTE(flupe):
+--  We do this because CertiCoq requires fully-applied constructors.
+--  In the future, this transformation should be made on the Coq side.
+--  (as it would be proven correct).
+--  NB: MetaCoq provides eta-expansion of constructors, but only for eprograms.
+--  (see : erasure/theories/EConstructorsAsBlocks.v)
+
+-- | Check whether a treeless term is a constructor applied to (many) terms.
+unSpineCon :: TTerm -> Maybe (QName, [TTerm])
+unSpineCon (TCon q)   = Just (q, [])
+unSpineCon (TApp u v) = second (++ v) <$> unSpineCon u
+unSpineCon _          = Nothing
+
+-- | Return the arity of a constructor. Ignores parameters.
+conArity :: ConstructorInfo -> Int
+conArity (DataCon a) = a
+conArity (RecordCon _ _ a _) = a
+
+-- | Eta-expand treeless constructors.
+etaExpandCtor :: TTerm -> TCM TTerm
+etaExpandCtor t | Just (q, args) <- unSpineCon t = do
+  arity <- conArity <$> getConstructorInfo q
+  let nargs = length args
+
+  if nargs >= arity then -- should really be (==), but just in case
+    TApp (TCon q) <$> mapM etaExpandCtor args
+  else do
+    let nlam = arity - nargs
+    exargs <- mapM (etaExpandCtor . raise nlam) args
+    let vars = TVar <$> [(nlam - 1) .. 0]
+    pure $ iterate TLam (TApp (TCon q) $ exargs ++ vars) !! nlam
+
+etaExpandCtor t | otherwise = case t of
+  TApp u v             -> TApp <$> etaExpandCtor u <*> mapM etaExpandCtor v
+  TLam u               -> TLam <$> etaExpandCtor u
+  TLet u v             -> TLet <$> etaExpandCtor u <*> etaExpandCtor v
+  TCase k ci tdef alts -> TCase k ci <$> etaExpandCtor tdef 
+                                     <*> mapM etaExpandAlt alts
+  TCoerce u            -> TCoerce <$> etaExpandCtor u
+  _                    -> pure t
+
+etaExpandAlt :: TAlt -> TCM TAlt
+etaExpandAlt = \case
+  TACon q a b -> TACon q a <$> etaExpandCtor b
+  TAGuard a b -> TAGuard a <$> etaExpandCtor b
+  TALit l b   -> TALit l <$> etaExpandCtor b
+
+  
 
 {-
 lookupCtx :: MonadTCEnv m => Int -> m (String, Type)

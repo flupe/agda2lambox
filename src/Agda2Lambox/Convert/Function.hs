@@ -40,7 +40,7 @@ convertFunctionBody :: Definition :~> Term
 convertFunctionBody Defn{defName} =
   withCurrentModule (qnameModule defName) do
     Just t <- liftTCM $ toTreeless EagerEvaluation defName
-    convert t
+    convert =<< liftTCM (etaExpandCtor t)
 
 -- | Whether a function is a (true) record projection.
 isProjection :: Either ProjectionLikenessMissing Projection -> Bool

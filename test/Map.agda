@@ -19,5 +19,5 @@ map f [] = []
 map f (x :: xs) = f x :: map f xs
 
 ys : List Nat
-ys = map (\x -> add x x) xs
+ys = map succ xs
 {-# COMPILE AGDA2LAMBOX ys #-}

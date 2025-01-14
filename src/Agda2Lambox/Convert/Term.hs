@@ -22,10 +22,6 @@ import qualified LambdaBox as L
 import Agda2Lambox.Monad
 import Agda2Lambox.Convert.Class
 
--- quick fix, remove this asap
-app :: L.Term -> L.Term -> L.Term
-app (LCtor ind k es) arg = LCtor ind k (es ++ [arg])
-app t arg                = LApp t arg
 
 -- | Compiling (treeless) Agda terms into Lambox expressions.
 instance A.TTerm ~> L.Term where
@@ -37,10 +33,14 @@ instance A.TTerm ~> L.Term where
       return case qn `elemIndex` mutuals of
         Nothing -> LConst $ qnameToKerName qn
         Just i  -> LRel   $ i + boundVars
+    -- fully-applied constructors
+    A.TApp tc@(A.TCon q) args -> do
+      LCtor ind i [] <- go tc
+      LCtor ind i <$> mapM go args
     A.TApp t args -> do
       ct    <- go t
       cargs <- mapM go args
-      return $ foldl app ct cargs
+      return $ foldl LApp ct cargs
     A.TLam t -> inBoundVar $ LLam <$> go t
     A.TLit l -> go l
     A.TCon qn -> do
@@ -48,8 +48,7 @@ instance A.TTerm ~> L.Term where
       ctrs <- liftTCM $ getConstructors dt
       Just i <- pure $ qn `elemIndex` ctrs
       return $ LCtor (L.Inductive (qnameToKerName dt) 0) i [] 
-      -- TODO(flupe): I *think* constructors have to be fully-applied
-      -- TODO(flupe): mutual inductives
+      -- TODO(flupe): ^ mutual inductives
     A.TLet tt tu -> LLet <$> go tt <*> inBoundVar (go tu)
     A.TCase n A.CaseInfo{..} tt talts ->
       case caseErased of
@@ -91,7 +90,7 @@ instance A.Literal ~> L.Term where
 
       let indnat = L.Inductive (qnameToKerName qnat) 0
 
-      return $ (!! fromInteger n) $ iterate (app (LCtor indnat 1 [])) (LCtor indnat 0 [])
+      return $ (!! fromInteger n) $ iterate (LApp (LCtor indnat 1 [])) (LCtor indnat 0 [])
 
     LitWord64 w -> fail "Literal int64 not supported"
     LitFloat  f -> fail "Literal float not supported"

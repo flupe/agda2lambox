@@ -26,8 +26,8 @@ Notation "x 'eqn:' p" := (exist _ x p) (only parsing, at level 20).
 Definition eflags : EEnvFlags :=
   {| has_axioms      := true;
      term_switches   := all_term_flags;
-     has_cstr_params := false;  (* CertiCoq doesn't want params in ctors *)
-     cstr_as_blocks  := true     (* CertiCoq seem to require fully-applied ctors *)
+     has_cstr_params := false;  (* Agda already drops constructor params *)
+     cstr_as_blocks  := true;   (* The backend fully applies ctors       *)
   |}.
 
 Fixpoint check_fresh_global (k : kername) (decls : global_declarations) : bool :=
