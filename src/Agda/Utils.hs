@@ -113,6 +113,17 @@ etaExpandAlt = \case
   TALit l b   -> TALit l <$> etaExpandCtor b
 
   
+-- * projections
+
+isRecordProjection :: Defn -> Maybe (QName, QName)
+isRecordProjection d
+  | Function{..} <- d
+  , Right Projection{..} <- funProjection
+  , Just recName <- projProper
+  = Just (recName, projOrig)
+  | otherwise
+  = Nothing
+
 
 {-
 lookupCtx :: MonadTCEnv m => Int -> m (String, Type)
@@ -418,15 +429,6 @@ isRecDef = \case
 isFunDef = \case
   Function{} -> True
   _ -> False
-
-isRecordProjection :: Defn -> Maybe (QName, QName)
-isRecordProjection d
-  | Function{..} <- d
-  , Right Projection{..} <- funProjection
-  , Just recName <- projProper
-  = Just (recName, projOrig)
-  | otherwise
-  = Nothing
 
 funCC :: (MonadTCM m, HasConstInfo m) => QName -> m CompiledClauses
 funCC q = do

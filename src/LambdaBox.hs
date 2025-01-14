@@ -8,8 +8,6 @@ import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Abstract.Name ( QName(..), ModuleName(..) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 
--- TODO(flupe): Record projections?
-
 -- | Identifiers.
 -- Used only for pretty-printing by MetaCoq?
 -- MetaCoq uses bytestrings, it doesn't matter here.
@@ -124,18 +122,17 @@ data Term
   | LVar Ident       -- ^ Free variable with identifier
       -- NOTE(flupe): not needed?
   | LLam Term        -- ^ Lambda abstraction
-  | LLet Term Term  
+  | LLet Term Term
       -- ^ Let bindings.
       --   Unused in the backend, since Agda itself no longer has let bindings
       --   in the concrete syntac.
   | LApp Term Term              -- ^ Term application
   | LConst KerName              -- ^ Named constant.
-    -- TODO(flupe): I *think* constructors have to be fully-applied.
   | LCtor Inductive Int [Term]  -- ^ Inductive constructor.
   | LCase Inductive Int Term [([Name], Term)]
       -- ^ Pattern-matching case construct.
   | LFix MFixpoint Int
-      -- ^ Fixpoint combinator. 
+      -- ^ Fixpoint combinator.
       -- The index refers to which fixpoint we select out of
       -- the generated (mutual) fixpoints.
   deriving (Eq, Show)

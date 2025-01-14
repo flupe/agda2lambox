@@ -42,18 +42,12 @@ convertFunctionBody Defn{defName} =
     Just t <- liftTCM $ toTreeless EagerEvaluation defName
     convert =<< liftTCM (etaExpandCtor t)
 
--- | Whether a function is a (true) record projection.
-isProjection :: Either ProjectionLikenessMissing Projection -> Bool
-isProjection (Left _) = False
-isProjection (Right Projection{projProper}) = isJust projProper
-
 -- | Whether to compile a function definition to λ□.
 shouldCompileFunction :: Definition -> Bool
 shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
   = not (theDef ^. funInline)           -- not inlined (from module application)
     && isNothing funExtLam              -- not a pattern-lambda-generated function   NOTE(flupe): ?
     && isNothing funWith                -- not a with-generated function             NOTE(flupe): ?
-    && not (isProjection funProjection) -- not a record projection
     && hasQuantityω def                 -- non-erased
 
 -- | Convert a function definition to a λ□ declaration.
@@ -71,9 +65,6 @@ convertFunction defn@Defn{defName, theDef} =
       if any (not . isFunction) mdefs then
         fail "Induction-recursion and other weird mutual defs not supported."
       else inMutuals ms do
-        -- NOTE(flupe):
-        --   maybe reverse ms here?
-        --   it's unclear in which order mutual fixpoints are added to the local context
         let Just k = elemIndex defName ms
 
         Just . ConstantDecl . Just . flip LFix k <$>

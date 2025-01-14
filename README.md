@@ -32,7 +32,7 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
   - [x] Using the λ□-Mut from CertiCoq
 - [ ] Support mutual inductives
 - [x] Support (one-inductive) records
-  - [ ] Properly translate projections in terms.
+  - [x] Properly translate projections in terms (by actually generating projections)
 - [ ] Support mutual (possibly inductive) records
 - [ ] Better error-reporting
 - [ ] "Support" modules

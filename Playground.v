@@ -1,27 +1,17 @@
-From MetaCoq.Template Require Import Loader.
+From MetaCoq.Template      Require Import Loader Ast.
 From MetaCoq.ErasurePlugin Require Import Erasure Loader.
-From MetaCoq.Utils Require Import utils.
-From MetaCoq.Template Require Import Ast.
-From MetaCoq.Erasure.Typed Require Import ResultMonad.
-From MetaCoq.Erasure.Typed Require Import Optimize.
-From MetaCoq.Erasure.Typed Require Import Extraction.
-From Coq Require Import ZArith.
-From Coq Require Import List.
-From Coq Require Import String.
-From Coq Require Import Nat.
+From MetaCoq.Utils         Require Import utils.
+From Coq Require Import ZArith List String Nat.
 
-Import MCMonadNotation.
 Import ListNotations.
 
-Local Open Scope string.
-Local Notation "'bs_to_s' s" := (bytestring.String.to_string s) (at level 200).
-Local Notation "'s_to_bs' s" := (bytestring.String.of_string s) (at level 200).
+Check run_erase_program.
 
+Locate run_erase_program.
 
-Program Definition cic_to_box p :=
-  run_erase_program default_erasure_config ([], p) _.
+Program Definition cic_to_box (p : program) :=
+  run_erase_program default_erasure_config p _.
 Next Obligation.
-  split. easy.
   split.
   now eapply assume_that_we_only_erase_on_welltyped_programs.
   cbv [PCUICWeakeningEnvSN.normalizationInAdjustUniversesIn].
@@ -52,7 +42,23 @@ with odd (n : nat)  :=
     | S n => even n
   end.
 
-Definition prog  := double.
+Set Primitive Projections.
+Set Printing Projections.
 
-MetaCoq Quote Recursively Definition ex1 := prog.
+Record Prod (A B : Type) : Type := Pair
+  { fst : A
+  ; snd : B
+  }.
+
+Arguments Pair {_ _} _ _.
+Arguments fst {_ _} _.
+Arguments snd {_ _} _.
+
+Definition pair : Prod bool bool := Pair true false.
+
+Definition prog  := pair.(fst).
+
+MetaCoq Quote Recursively Definition ex1 := fst.
+Check ex1.
+Print ex1.
 Eval vm_compute in cic_to_box ex1.

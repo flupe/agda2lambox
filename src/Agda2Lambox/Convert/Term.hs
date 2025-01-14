@@ -1,20 +1,24 @@
-{-# LANGUAGE LambdaCase, FlexibleInstances #-}
+{-# LANGUAGE LambdaCase, FlexibleInstances, NamedFieldPuns #-}
 module Agda2Lambox.Convert.Term () where
 
 import Control.Monad.Reader ( ask, liftIO )
+import Data.Foldable ( foldlM )
 import Data.List ( elemIndex )
+import Data.Bifunctor ( second )
+import Data.Functor ( (<&>) )
 
 import Utils
 
 import Agda ( liftTCM, getConstructorData, getConstructors )
 import qualified Agda as A
 import Agda.Lib ()
-import Agda.Utils
+import Agda.Utils ( isRecordProjection )
 import Agda.Syntax.Literal
+import Agda.Syntax.Internal ( unDom )
 import Agda.Syntax.Abstract.Name ( QName(..), ModuleName(..) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.TypeChecking.Primitive.Base ( getBuiltinName )
-import Agda.Compiler.Backend ( builtinNat, builtinZero, builtinSuc )
+import Agda.Compiler.Backend hiding (Name)
 
 import LambdaBox
 import qualified LambdaBox as L
@@ -22,14 +26,13 @@ import qualified LambdaBox as L
 import Agda2Lambox.Monad
 import Agda2Lambox.Convert.Class
 
-
 -- | Compiling (treeless) Agda terms into Lambox expressions.
 instance A.TTerm ~> L.Term where
   go = \case
     A.TVar n   -> return $ LRel n
     A.TPrim pr -> go pr 
     A.TDef qn -> do
-      Env{..} <- ask
+      Env{mutuals, boundVars} <- ask
       return case qn `elemIndex` mutuals of
         Nothing -> LConst $ qnameToKerName qn
         Just i  -> LRel   $ i + boundVars
@@ -57,8 +60,8 @@ instance A.TTerm ~> L.Term where
           calts <- traverse go talts
           cind  <- go caseType
           return $ LCase cind 0 (LRel n) calts
-    A.TUnit -> return LBox
-    A.TSort -> return LBox
+    A.TUnit   -> return LBox
+    A.TSort   -> return LBox
     A.TErased -> return LBox
     A.TCoerce tt  -> fail "Coerces are not supported."
     A.TError terr -> fail "Errors are not supported."
