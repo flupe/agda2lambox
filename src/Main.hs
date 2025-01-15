@@ -24,8 +24,8 @@ import Agda2Lambox.Convert.Function ( convertFunction )
 import Agda2Lambox.Convert.Data     ( convertDatatype )
 import Agda2Lambox.Convert.Record   ( convertRecord   )
 import Agda2Lambox.Monad ( runC0, inMutuals )
-import CoqGen ( ToCoq(ToCoq), CoqModule(..) )
-import LambdaBox ( KerName, GlobalDecl, qnameToKerName )
+import CoqGen ( ToCoq(ToCoq) )
+import LambdaBox ( KerName, GlobalDecl, qnameToKerName, CoqModule(CoqModule) )
 
 
 main :: IO ()
@@ -109,9 +109,15 @@ writeModule opts menv _ m (reverse . catMaybes -> cdefs) = do
 
   liftIO $ createDirectoryIfMissing True outDir
 
+  let mod = CoqModule cdefs progs
+
   unless (null cdefs) $ liftIO do
-    putStrLn $ "Writing " <> fileName ".v"
+    putStrLn $ "Writing " <> fileName ".{v,txt}"
+
+    writeFile (fileName ".txt")
+      $ (<> "\n")
+      $ pp $ mod
 
     writeFile (fileName ".v")
       $ (<> "\n")
-      $ pp $ ToCoq $ CoqModule cdefs progs
+      $ pp $ ToCoq $ mod

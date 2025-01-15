@@ -160,12 +160,6 @@ instance Pretty (ToCoq t) => Pretty (ToCoq (Def t)) where
            , ("rarg",  pcoq dArgs)
            ]
 
--- | Generated module
-data CoqModule = CoqModule
-  { coqEnv      :: [(KerName, GlobalDecl)]
-  , coqPrograms :: [KerName]
-  }
-
 instance Pretty (ToCoq CoqModule) where
   pretty (ToCoq CoqModule{..}) = vsep
     [ vcat

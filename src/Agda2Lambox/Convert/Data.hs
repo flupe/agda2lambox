@@ -5,8 +5,9 @@ module Agda2Lambox.Convert.Data
   ) where
 
 import Control.Monad.Reader ( ask, liftIO )
-import Control.Monad ( forM )
+import Control.Monad ( forM, when, unless )
 import Data.List ( elemIndex )
+import Data.Maybe ( isJust )
 
 import Utils
 
@@ -31,9 +32,14 @@ import Agda.Utils.Monad (guardWithError)
 
 -- | Convert a datatype definition to a Lambdabox declaration.
 convertDatatype :: Definition :~> GlobalDecl
-convertDatatype defn@Defn{defName, theDef} =
+convertDatatype defn@Defn{defName, theDef, defMutual} =
   withCurrentModule (qnameModule defName) do
     let Datatype{..} = theDef
+
+    let Just muts = dataMutual
+
+    unless (length muts < 2) $
+      fail $ "mututal datatypes not supported" <> prettyShow dataMutual
 
     ctors :: [ConstructorBody]
       <- forM dataCons \cname -> do

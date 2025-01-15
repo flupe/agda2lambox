@@ -186,6 +186,13 @@ data GlobalDecl
 
 type GlobalDecls = [(KerName, GlobalDecl)]
 
+-- | Generated module
+data CoqModule = CoqModule
+  { coqEnv      :: [(KerName, GlobalDecl)]
+  , coqPrograms :: [KerName]
+  }
+
+
 instance Pretty Term where
   prettyPrec p v =
     case v of
@@ -227,3 +234,32 @@ instance Pretty Name where
   prettyPrec _ = \case
     Anon -> text "_"
     Named s -> text s
+
+
+instance Pretty ConstructorBody where
+  pretty Ctor{..} =
+    pretty ctorName <+> parens (pretty ctorArgs <+> "arg(s)")
+
+instance Pretty OneInductiveBody where
+  pretty OneInductive{..} =
+    vcat
+      [ pretty indName
+      , "constructors:" <+> pretty indCtors
+      ]
+
+instance Pretty GlobalDecl where
+  pretty = \case
+    ConstantDecl (Just b) ->
+      hang "constant:" 2 $ pretty b
+
+    ConstantDecl Nothing ->
+      "primitive constant"
+
+    InductiveDecl MutualInductive{..} ->
+      hang "mutual inductive(s):" 2 $ 
+        vsep $ map pretty indBodies
+
+instance Pretty CoqModule where
+  pretty CoqModule{..} =
+    vsep $ flip map (reverse coqEnv) \(kn, d) ->
+      hang (pretty kn <> ":") 2 (pretty d)
