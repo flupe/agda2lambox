@@ -6,6 +6,7 @@ import Data.Foldable ( foldlM )
 import Data.List ( elemIndex )
 import Data.Bifunctor ( second )
 import Data.Functor ( (<&>) )
+import Data.Maybe ( fromMaybe, listToMaybe )
 
 import Utils
 
@@ -25,6 +26,14 @@ import qualified LambdaBox as L
 
 import Agda2Lambox.Monad
 import Agda2Lambox.Convert.Class
+
+toInd :: QName -> C Inductive
+toInd q = liftTCM do
+  Datatype{..} <- theDef <$> getConstInfo q
+  let Just names = dataMutual
+  let repr = fromMaybe q $ listToMaybe names
+  let idx  = fromMaybe 0 $ elemIndex q names
+  return $ L.Inductive (qnameToKerName repr) idx
 
 -- | Compiling (treeless) Agda terms into Lambox expressions.
 instance A.TTerm ~> L.Term where
@@ -49,8 +58,9 @@ instance A.TTerm ~> L.Term where
     A.TCon qn -> do
       dt   <- liftTCM $ getConstructorData qn
       ctrs <- liftTCM $ getConstructors dt
+      ind  <- toInd dt
       Just i <- pure $ qn `elemIndex` ctrs
-      return $ LCtor (L.Inductive (qnameToKerName dt) 0) i [] 
+      return $ LCtor ind i [] 
       -- TODO(flupe): ^ mutual inductives
     A.TLet tt tu -> LLet <$> go tt <*> inBoundVar (go tu)
     A.TCase n A.CaseInfo{..} tt talts ->
@@ -74,8 +84,7 @@ instance A.TAlt ~> ([Name], L.Term) where
 
 instance A.CaseType ~> L.Inductive where
   go = \case
-    A.CTData qn -> return $ L.Inductive (qnameToKerName qn) 0 
-                   -- TODO(flupe): handle mutual inductive
+    A.CTData qn -> toInd qn
 
     -- Builtin Nat
     A.CTNat -> do

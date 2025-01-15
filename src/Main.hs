@@ -90,7 +90,7 @@ compile opts menv _ def@Defn{..} =
 
           runC0 (convertFunction def)
 
-      Datatype{} -> Just <$> runC0 (convertDatatype def)
+      Datatype{} -> runC0 (convertDatatype def)
 
       Record{}   -> Just <$> runC0 (convertRecord def)
 

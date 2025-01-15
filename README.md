@@ -30,7 +30,11 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
   - [x] Make well-formedness check faster by splitting it into boolean and propositional.
 - [x] Evaluate λ□ programs from inside Coq to start testing
   - [x] Using the λ□-Mut from CertiCoq
-- [ ] Support mutual inductives
+- [x] Support mutual inductives
+- [ ] Refactor backend
+  - Get rid of the Convert class.
+  - Possibly put everything in a single module.
+  - Unify compilation of records and datatypes.
 - [x] Support (one-inductive) records
   - [x] Properly translate projections in terms (by actually generating projections)
 - [ ] Support mutual (possibly inductive) records

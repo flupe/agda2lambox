@@ -57,7 +57,7 @@ convertFunction defn@Defn{defName, theDef} =
   withCurrentModule (qnameModule defName) do
     let Function{funMutual = Just ms} = theDef
 
-    if null ms then 
+    if length ms < 2 then 
       Just. ConstantDecl . Just <$> convertFunctionBody defn
     else do
       mdefs :: [Definition] <- mapM getConstInfo ms
