@@ -43,6 +43,8 @@ Notes and questions on the ongoing implementation of `agda2lambox`.
 
 - How would we make it easier to do the plumbing from inside Agda?
 
+- How to generate an actual file from CertiCoq-WASM or CertiCoq-Rust?
+
 [ctorblocks]: https://github.com/MetaCoq/metacoq/blob/v1.3.1-8.19/erasure/theories/EConstructorsAsBlocks.v
 [envflags]: https://github.com/MetaCoq/metacoq/blob/ea3ed3c4b0d05508ce744f17a56c880c5f47c816/erasure/theories/EWellformed.v#L55
 
