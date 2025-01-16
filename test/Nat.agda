@@ -9,6 +9,9 @@ add : Nat → Nat → Nat
 add zero y = y
 add (succ x) y = succ (add x y)
 
+incr : Nat → Nat
+incr = succ
+
 deux trois : Nat
 deux  = succ (succ zero)
 trois = succ (succ (succ zero))

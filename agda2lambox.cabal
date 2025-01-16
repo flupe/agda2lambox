@@ -18,15 +18,12 @@ executable agda2lambox
   other-modules:       Agda,
                        Agda.Lib,
                        Agda.Utils,
-                       Agda2Lambox.Monad,
-                       Agda2Lambox.Convert,
-                       Agda2Lambox.Convert.Class,
-                       Agda2Lambox.Convert.Data,
-                       Agda2Lambox.Convert.Function,
-                       Agda2Lambox.Convert.Record,
-                       Agda2Lambox.Convert.Term,
-                       Agda2Lambox,
-                       Utils,
+                       Agda2Lambox.Compile.Utils,
+                       Agda2Lambox.Compile.Term,
+                       Agda2Lambox.Compile.Function,
+                       Agda2Lambox.Compile.Data,
+                       Agda2Lambox.Compile.Record,
+                       Agda2Lambox.Compile,
                        LambdaBox,
                        CoqGen,
                        Paths_agda2lambox
@@ -46,3 +43,4 @@ executable agda2lambox
     TypeFamilies TypeOperators TypeApplications
     FunctionalDependencies TypeSynonymInstances ConstraintKinds
     DoAndIfThenElse BlockArguments MultiWayIf
+    ImportQualifiedPost

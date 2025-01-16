@@ -19,11 +19,9 @@ import Paths_agda2lambox ( version )
 import Agda.Lib
 import Agda.Utils ( pp, hasPragma )
 
-import Agda2Lambox.Convert ( convert )
-import Agda2Lambox.Convert.Function ( convertFunction )
-import Agda2Lambox.Convert.Data     ( convertDatatype )
-import Agda2Lambox.Convert.Record   ( convertRecord   )
-import Agda2Lambox.Monad ( runC0, inMutuals )
+import Agda2Lambox.Compile.Function ( compileFunction )
+import Agda2Lambox.Compile.Data     ( compileData     )
+import Agda2Lambox.Compile.Record   ( compileRecord   )
 import CoqGen    ( ToCoq(ToCoq) )
 import LambdaBox ( KerName, GlobalDecl, qnameToKerName, CoqModule(..) )
 
@@ -98,11 +96,11 @@ compileDefinition opts menv _ def@Defn{..} =
           whenM (hasPragma defName) $ 
             liftIO $ modifyIORef' (modProgs menv) (qnameToKerName defName:)
 
-          runC0 (convertFunction def)
+          compileFunction def
 
-      Datatype{} -> runC0 (convertDatatype def)
+      Datatype{} -> compileData def
 
-      Record{}   -> Just <$> runC0 (convertRecord def)
+      Record{}   -> Just <$> compileRecord def
 
       _          -> Nothing <$ (liftIO $ putStrLn $ "Skipping " <> prettyShow defName)
 

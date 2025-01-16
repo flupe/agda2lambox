@@ -4,7 +4,7 @@
 module Agda.Utils where
 
 import Control.Monad.Error.Class ( MonadError )
-import Control.Monad.IO.Class ( MonadIO )
+import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Control.Monad ( filterM )
 import Control.Arrow ( first )
 
@@ -13,7 +13,6 @@ import qualified Data.List.NonEmpty as NE ( fromList )
 import Data.Maybe ( isJust, isNothing )
 import Data.Bifunctor ( second )
 
-import Utils
 import Agda.Lib
 import Agda.TypeChecking.Free.Lazy (underBinder)
 import Agda.TypeChecking.Datatypes (getConstructorInfo, ConstructorInfo(..))
@@ -54,7 +53,7 @@ currentCtx = fmap (first pp . unDom) <$> getContext
 reportCurrentCtx :: (MonadIO m, MonadTCEnv m) => m ()
 reportCurrentCtx = do
   ctx <- currentCtx
-  report $ " currentCtx: " <> pp ctx
+  liftIO $ putStrLn $ " currentCtx: " <> pp ctx
 
 unqual :: QName -> String
 unqual = pp . last . qnameToList0

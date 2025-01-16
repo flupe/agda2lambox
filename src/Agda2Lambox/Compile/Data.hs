@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, ImportQualifiedPost #-}
 -- | Convert Agda datatypes to λ□ inductive declarations
-module Agda2Lambox.Convert.Data
-  ( convertDatatype
+module Agda2Lambox.Compile.Data
+  ( compileData
   ) where
 
 import Control.Monad.Reader ( ask, liftIO )
@@ -11,11 +11,7 @@ import Data.Foldable ( toList )
 import Data.List ( elemIndex )
 import Data.Maybe ( isJust, listToMaybe )
 
-import Utils
-
 import Agda ( liftTCM )
-import Agda.Lib ()
-import Agda.Utils
 import Agda.Syntax.Abstract.Name ( qnameModule, qnameName )
 import Agda.TypeChecking.Monad.Base
 import Agda.TypeChecking.Monad.Env ( withCurrentModule )
@@ -25,24 +21,24 @@ import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock )
 import Agda.Syntax.Treeless ( EvaluationStrategy(EagerEvaluation) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 
-import LambdaBox
-
-import Agda2Lambox.Monad
-import Agda2Lambox.Convert.Class
-import Agda.Utils.Monad (guardWithError)
+import Agda2Lambox.Compile.Utils
+import LambdaBox qualified as LBox
 
 
 -- | Toplevel conversion from a datatype definition to a Lambdabox declaration.
-convertDatatype :: Definition :~> Maybe GlobalDecl
-convertDatatype defn@Defn{defName, defMutual} = do
+compileData :: Definition -> TCM (Maybe LBox.GlobalDecl)
+compileData defn@Defn{defName, defMutual} = do
   let Datatype{..} = theDef defn
-  let Just names = dataMutual
+  let names = case dataMutual of
+        Just [] -> [defName]
+        Just xs -> xs
+        Nothing -> fail "error"
 
   -- we consider that the *lowest name* in the mutual block
   -- is the *representative* of the mutual block
   -- i.e that's when we trigger the compilation of the mutual block
 
-  if not (null names) && Just defName /= listToMaybe names then return Nothing
+  if Just defName /= listToMaybe names then return Nothing
   else do
 
     -- when it's time to compile the mutual block
@@ -52,10 +48,10 @@ convertDatatype defn@Defn{defName, defMutual} = do
 
     unless onlyDatas $ fail "not supported: mutual datatypes with non-datatypes"
 
-    bodies <- forM names $ liftTCM . getConstInfo >=> actuallyConvertDatatype
+    bodies <- forM names $ getConstInfo >=> actuallyConvertDatatype
 
-    return $ Just $ InductiveDecl $ MutualInductive
-      { indFinite = Finite
+    return $ Just $ LBox.InductiveDecl $ LBox.MutualInductive
+      { indFinite = LBox.Finite
           -- NOTE(flupe): Agda's datatypes are *always* finite?
           -- Co-induction is restricted to records.
           -- We may want to set BiFinite for non-recursive datatypes, but I don't know yet.
@@ -66,24 +62,23 @@ convertDatatype defn@Defn{defName, defMutual} = do
 
 
 
-actuallyConvertDatatype :: Definition :~> OneInductiveBody
-actuallyConvertDatatype defn@Defn{defName, theDef, defMutual} =
-  withCurrentModule (qnameModule defName) do
+actuallyConvertDatatype :: Definition -> TCM LBox.OneInductiveBody
+actuallyConvertDatatype defn@Defn{defName, theDef, defMutual} = do
     let Datatype{..} = theDef
 
-    ctors :: [ConstructorBody]
+    ctors :: [LBox.ConstructorBody]
       <- forM dataCons \cname -> do
            DataCon arity <- getConstructorInfo cname
-           return Ctor
+           return LBox.Ctor
              { ctorName = prettyShow $ qnameName cname
              , ctorArgs = arity
              }
 
-    return OneInductive
+    return LBox.OneInductive
       { indName          = prettyShow $ qnameName defName
       , indPropositional = False
           -- TODO(flupe): ^ take care of this (use datatypeSort to figure this out)
-      , indKElim         = IntoAny
+      , indKElim         = LBox.IntoAny
           -- TODO(flupe): also take care of this (with the Sort)
       , indCtors         = ctors
       , indProjs         = []
