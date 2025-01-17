@@ -1,9 +1,6 @@
 {-# LANGUAGE NamedFieldPuns, DerivingVia, GeneralizedNewtypeDeriving #-}
 module Agda2Lambox.Compile.Term
-  ( C
-  , runC
-  , withMutuals
-  , compileTerm
+  ( compileTerm
   ) where
 
 import Control.Monad ( mapM )
@@ -74,8 +71,16 @@ withMutuals ms = local \e -> e { mutuals = reverse ms }
 -- * Term conversion
 
 -- | Convert a treeless term to its λ□ equivalent.
-compileTerm :: TTerm -> C LBox.Term
-compileTerm = \case
+compileTerm
+  :: [QName]
+     -- ^ Local fixpoints.
+  -> TTerm
+  -> TCM LBox.Term
+compileTerm ms = runC . withMutuals ms . compileTermC
+
+-- | Convert a treeless term to its λ□ equivalent.
+compileTermC :: TTerm -> C LBox.Term
+compileTermC = \case
   TVar  n -> pure $ LRel n
   TPrim p -> fail "primitives not supported"
 
@@ -86,20 +91,20 @@ compileTerm = \case
       Just i  -> LRel   $ i + boundVars
 
   TCon q             -> liftTCM $ toConApp q []
-  TApp (TCon q) args -> liftTCM . toConApp q =<< mapM compileTerm args
+  TApp (TCon q) args -> liftTCM . toConApp q =<< mapM compileTermC args
   -- ^ For dealing with fully-applied constructors
 
   TApp u es -> do
-    cu  <- compileTerm u
-    ces <- mapM compileTerm es
+    cu  <- compileTermC u
+    ces <- mapM compileTermC es
     pure $ foldl' LApp cu ces
 
-  TLam t -> underBinder $ LLam <$> compileTerm t
+  TLam t -> underBinder $ LLam <$> compileTermC t
 
   TLit l -> fail "literals not supported"
 
-  TLet u v -> LLet <$> compileTerm u
-                   <*> underBinder (compileTerm v)
+  TLet u v -> LLet <$> compileTermC u
+                   <*> underBinder (compileTermC v)
 
   TCase n CaseInfo{..} dt talts ->
     case caseErased of
@@ -125,6 +130,6 @@ compileCaseType = \case
 compileAlt :: TAlt -> C ([LBox.Name], LBox.Term)
 compileAlt = \case
   TACon{..}   -> let names = take aArity $ repeat LBox.Anon
-                 in (names,) <$> underBinders aArity (compileTerm aBody)
+                 in (names,) <$> underBinders aArity (compileTermC aBody)
   TALit{..}   -> fail "literal patterns not supported"
   TAGuard{..} -> fail "case guards not supported"

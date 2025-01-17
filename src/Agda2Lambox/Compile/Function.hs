@@ -20,7 +20,7 @@ import Agda.Utils.Monad (guardWithError)
 
 import Agda.Utils ( etaExpandCtor )
 import Agda2Lambox.Compile.Utils
-import Agda2Lambox.Compile.Term ( runC, compileTerm, withMutuals )
+import Agda2Lambox.Compile.Term ( compileTerm )
 import LambdaBox qualified as LBox
 
 
@@ -32,9 +32,9 @@ isFunction _ = False
 
 -- | Convert a function body to a Lambdabox term.
 compileFunctionBody :: [QName] -> Definition -> TCM LBox.Term
-compileFunctionBody fixpoints Defn{defName} = do
+compileFunctionBody ms Defn{defName} = do
     Just t <-toTreeless EagerEvaluation defName
-    runC . withMutuals fixpoints . compileTerm =<< etaExpandCtor t
+    compileTerm ms =<< etaExpandCtor t
 
 
 -- | Whether to compile a function definition to λ□.
