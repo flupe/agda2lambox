@@ -38,6 +38,7 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 - [x] Support (one-inductive) records
   - [x] Properly translate projections in terms (by actually generating projections)
 - [x] Support mutual (possibly inductive) records
+- [ ] Traverse multiple files to get all (required) definitions.
 - [ ] Better error-reporting
 - [ ] "Support" modules
 - [ ] Check support for Agda-specific edge cases

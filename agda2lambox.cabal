@@ -17,6 +17,7 @@ executable agda2lambox
   main-is:             Main.hs
   other-modules:       Agda.Utils,
                        Agda2Lambox.Compile.Utils,
+                       Agda2Lambox.Compile.Monad,
                        Agda2Lambox.Compile.Term,
                        Agda2Lambox.Compile.Function,
                        Agda2Lambox.Compile.Inductive,
@@ -29,7 +30,9 @@ executable agda2lambox
   build-depends:       base       >= 4.10  && < 4.22,
                        Agda       >= 2.7   && <= 2.8,
                        deepseq    >= 1.4.4 && < 1.6,
+                       queues     >= 1.0.0 && < 1.2,
                        pretty-show,
+                       containers,
                        directory,
                        filepath,
                        mtl
