@@ -41,7 +41,7 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 - [ ] Better error-reporting
 - [ ] "Support" modules
 - [ ] Check support for Agda-specific edge cases
-  - [ ] Pattern-matching lambdas
+  - [x] Pattern-matching lambdas
   - [ ] With-generated lambdas
   - [ ] Module applications
   - [ ] Projection-like

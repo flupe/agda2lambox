@@ -41,7 +41,7 @@ compileFunctionBody ms Defn{defName} = do
 shouldCompileFunction :: Definition -> Bool
 shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
   = not (theDef ^. funInline) -- not inlined (from module application)
-    && isNothing funExtLam    -- not a pattern-lambda-generated function   NOTE(flupe): ?
+    && isNothing funExtLam    -- not a pattern-lambda-generated function (inlined by the treeless translation)
     && isNothing funWith      -- not a with-generated function             NOTE(flupe): ?
     && hasQuantityω def       -- non-erased
 
