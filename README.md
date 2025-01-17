@@ -27,26 +27,26 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 - [x] Add pragma for program selection
 - [x] Make pretty-printer prettier
 - [x] Ensure well-formedness of generated programs inside Coq
-  - [x] Make well-formedness check faster by splitting it into boolean and propositional.
+  - [x] Make well-formedness check faster by splitting it into boolean and propositional
 - [x] Evaluate λ□ programs from inside Coq to start testing
   - [x] Using the λ□-Mut from CertiCoq
 - [x] Support mutual inductives
 - [x] Refactor backend
   - Get rid of the Convert class.
-  - Possibly put everything in a single module.
-  - Unify compilation of records and datatypes.
+  - Possibly put everything in a single module
+  - Unify compilation of records and datatypes
 - [x] Support (one-inductive) records
   - [x] Properly translate projections in terms (by actually generating projections)
 - [x] Support mutual (possibly inductive) records
-- [ ] Traverse multiple files to get all (required) definitions.
+- [x] Traverse multiple files to get all (required) definitions
+- [ ] Support (nat) literals
 - [ ] Better error-reporting
-- [ ] "Support" modules
 - [ ] Check support for Agda-specific edge cases
   - [x] Pattern-matching lambdas
   - [x] With-generated lambdas
   - [ ] Module applications
   - [ ] Projection-like
-- [ ] Support literals (ints and floats)
+- [ ] Support primitives (ints and floats)
 - [ ] Setup compilation to Wasm/Rust using Certicoq
   - [ ] May require generating λ□ terms for an older MetaCoq
 - [ ] Setup proper testing infrastructure
