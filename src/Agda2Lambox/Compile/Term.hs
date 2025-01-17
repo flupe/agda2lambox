@@ -8,6 +8,7 @@ import Control.Monad.Fail ( MonadFail )
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader.Class ( MonadReader, ask )
 import Control.Monad.Reader ( ReaderT(runReaderT), local )
+import Control.Monad.Trans
 import Data.List ( elemIndex, foldl' )
 import Data.Maybe ( fromMaybe, listToMaybe )
 
@@ -23,6 +24,7 @@ import Agda.TypeChecking.Monad.Base ( TCM , liftTCM, MonadTCEnv, MonadTCM )
 import LambdaBox ( Term(..) )
 import LambdaBox qualified as LBox
 import Agda2Lambox.Compile.Utils
+import Agda2Lambox.Compile.Monad ( CompileM, requireDef )
 
 
 -- * Term compilation monad
@@ -45,13 +47,13 @@ initEnv = CompileEnv
   }
 
 -- | Compilation monad.
-newtype C a = C (ReaderT CompileEnv TCM a)
+newtype C a = C (ReaderT CompileEnv CompileM a)
   deriving newtype (Functor, Applicative, Monad, MonadIO)
   deriving newtype (MonadFail, MonadReader CompileEnv)
   deriving newtype (MonadTCEnv, MonadTCState, HasOptions, MonadTCM)
 
 -- | Run a compilation unit in @TCM@, in the initial environment.
-runC :: C a -> TCM a
+runC :: C a -> CompileM a
 runC (C m) = runReaderT m initEnv
 
 -- | Increase the number of locally-bound variables.
@@ -67,6 +69,9 @@ underBinder = underBinders 1
 withMutuals :: [QName] -> C a -> C a
 withMutuals ms = local \e -> e { mutuals = reverse ms }
 
+-- | Require a name to be compiled
+require :: QName -> C ()
+require = C . lift . requireDef
 
 -- * Term conversion
 
@@ -75,7 +80,7 @@ compileTerm
   :: [QName]
      -- ^ Local fixpoints.
   -> TTerm
-  -> TCM LBox.Term
+  -> CompileM LBox.Term
 compileTerm ms = runC . withMutuals ms . compileTermC
 
 -- | Convert a treeless term to its λ□ equivalent.
@@ -86,12 +91,12 @@ compileTermC = \case
 
   TDef qn -> do
     CompileEnv{mutuals, boundVars} <- ask
-    return case qn `elemIndex` mutuals of
-      Nothing -> LConst $ qnameToKName qn
-      Just i  -> LRel   $ i + boundVars
+    case qn `elemIndex` mutuals of
+      Nothing -> do require qn; pure $ LConst $ qnameToKName qn
+      Just i  -> pure $ LRel  $ i + boundVars
 
-  TCon q             -> liftTCM $ toConApp q []
-  TApp (TCon q) args -> liftTCM . toConApp q =<< mapM compileTermC args
+  TCon q             -> do require q; liftTCM (toConApp q [])
+  TApp (TCon q) args -> do require q; liftTCM . toConApp q =<< mapM compileTermC args
   -- ^ For dealing with fully-applied constructors
 
   TApp u es -> do
@@ -110,7 +115,7 @@ compileTermC = \case
     case caseErased of
       Erased _    -> fail "Erased matches not supported."
       NotErased _ -> do
-        cind  <- liftTCM $ compileCaseType caseType
+        cind  <- compileCaseType caseType
         LCase cind 0 (LRel n) <$> mapM compileAlt talts
 
   TUnit   -> return LBox
@@ -121,9 +126,9 @@ compileTermC = \case
   TError terr -> fail "Errors not supported."
 
 
-compileCaseType :: CaseType -> TCM LBox.Inductive
+compileCaseType :: CaseType -> C LBox.Inductive
 compileCaseType = \case
-  CTData qn -> toInductive qn
+  CTData qn -> do require qn; liftTCM $ toInductive qn
   _         -> fail "case type not supported"
 
 

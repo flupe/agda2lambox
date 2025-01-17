@@ -1,8 +1,8 @@
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, NamedFieldPuns #-}
 -- | The agda2lambox Agda backend
 module Main (main) where
 
-import Control.Monad ( unless )
+import Control.Monad ( unless, when, forM_ )
 import Control.Monad.IO.Class ( liftIO )
 import Control.DeepSeq ( NFData )
 import Data.Function ( (&) )
@@ -24,8 +24,9 @@ import Agda.Syntax.Common.Pretty ( pretty, prettyShow )
 import Agda.Utils.Monad ( whenM )
 
 import Agda.Utils ( pp, hasPragma, isDataOrRecDef )
-import Agda2Lambox.Compile.Function  ( compileFunction  )
-import Agda2Lambox.Compile.Inductive ( compileInductive )
+import Agda2Lambox.Compile.Utils (qnameToKName)
+import Agda2Lambox.Compile.Monad (compile, compileLoop, requireDef)
+import Agda2Lambox.Compile (compileDefinition)
 import CoqGen    ( ToCoq(ToCoq) )
 import LambdaBox ( KerName, GlobalDecl, qnameToKerName, CoqModule(..) )
 
@@ -47,8 +48,8 @@ defaultOptions :: Options
 defaultOptions = Options { optOutDir = Nothing }
 
 -- | Backend module environments.
-data ModuleEnv = ModuleEnv 
-  { modProgs :: IORef [KerName]
+data ModuleEnv = ModuleEnv
+  { modProgs :: IORef [QName]
      -- ^ Names of programs to extract in a module
   }
 
@@ -58,7 +59,7 @@ type ModuleRes = ()
 agda2lambox :: Backend
 agda2lambox = Backend backend
   where
-    backend :: Backend' Options Options ModuleEnv ModuleRes (Maybe (KerName, GlobalDecl))
+    backend :: Backend' Options Options ModuleEnv ModuleRes QName
     backend = Backend'
       { backendName           = "agda2lambox"
       , backendVersion        = Just $ showVersion version
@@ -72,7 +73,7 @@ agda2lambox = Backend backend
       , postCompile           = \ _ _ _ -> return ()
       , preModule             = moduleSetup
       , postModule            = writeModule
-      , compileDef            = compileDefinition
+      , compileDef            = compileDef'
       , scopeCheckingSuffices = False
       , mayEraseType          = \ _ -> return True
       }
@@ -86,43 +87,40 @@ moduleSetup _ _ m _ = do
   Recompile . ModuleEnv <$> liftIO (newIORef [])
 
 
-compileDefinition
+compileDef'
   :: Options -> ModuleEnv -> IsMain
   -> Definition
-  -> TCM (Maybe (KerName, GlobalDecl))
-compileDefinition opts menv _ def@Defn{..} =
-  fmap (qnameToKerName defName,) <$> -- prepend kername
-    case theDef of
+  -> TCM QName
+compileDef' opts menv ismain Defn{defName} = do
+  -- if it has a pragma, that's a program!
+  when (ismain == IsMain) $
+    whenM (hasPragma defName) $
+      liftIO $ modifyIORef' (modProgs menv) (defName :)
 
-      Function{} -> do
-        -- if the function is annotated with a COMPILE pragma
-        -- then it is added to the list of programs to run
-        whenM (hasPragma defName) $ 
-          liftIO $ modifyIORef' (modProgs menv) (qnameToKerName defName:)
-
-        compileFunction def
-
-      d | isDataOrRecDef d -> compileInductive def
-
-      _ -> Nothing <$ (liftIO $ putStrLn $ "Skipping " <> prettyShow defName)
+  pure defName
 
 
 -- | Collect global definitions and programs in a module
 -- and write them to disk.
 writeModule
   :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
-  -> [Maybe (KerName, GlobalDecl)]
+  -> [QName]
   -> TCM ModuleRes
-writeModule opts menv _ m (reverse . catMaybes -> cdefs) = do
+writeModule opts menv NotMain _ _ = pure ()
+writeModule opts menv IsMain m defs = do
   programs   <- liftIO $ readIORef $ modProgs menv
   outDir     <- flip fromMaybe (optOutDir opts) <$> compileDir
+
+  decls <- compile do
+    forM_ (reverse defs) requireDef
+    compileLoop compileDefinition
 
   liftIO $ createDirectoryIfMissing True outDir
 
   let fileName = (outDir </>) . moduleNameToFileName m
-      coqMod   = CoqModule cdefs programs
+      coqMod   = CoqModule decls (map qnameToKName programs)
 
-  unless (null cdefs) $ liftIO do
+  unless (null decls) $ liftIO do
     putStrLn $ "Writing " <> fileName ".{v,txt}"
 
     pp coqMod <> "\n"

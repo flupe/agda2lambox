@@ -21,6 +21,7 @@ import Agda.Utils.Lens ( (^.) )
 
 import Agda.Utils ( etaExpandCtor )
 import Agda2Lambox.Compile.Utils
+import Agda2Lambox.Compile.Monad
 import Agda2Lambox.Compile.Term ( compileTerm )
 import LambdaBox qualified as LBox
 
@@ -32,10 +33,10 @@ isFunction _ = False
 
 
 -- | Convert a function body to a Lambdabox term.
-compileFunctionBody :: [QName] -> Definition -> TCM LBox.Term
+compileFunctionBody :: [QName] -> Definition -> CompileM LBox.Term
 compileFunctionBody ms Defn{defName, theDef} = do
-  Just t <- toTreeless EagerEvaluation defName
-  compileTerm ms =<< etaExpandCtor t
+  Just t <- liftTCM $ toTreeless EagerEvaluation defName
+  compileTerm ms =<< liftTCM (etaExpandCtor t)
 
 
 -- | Whether to compile a function definition to λ□.
@@ -48,27 +49,29 @@ shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
 
 
 -- | Convert a function definition to a λ□ declaration.
-compileFunction :: Definition -> TCM (Maybe LBox.GlobalDecl)
+compileFunction :: Definition -> CompileM (Maybe LBox.GlobalDecl)
 compileFunction defn | not (shouldCompileFunction defn) = return Nothing
 compileFunction defn@Defn{theDef} = do
   let Function{funMutual = Just mutuals} = theDef
 
-  defs <- mapM getConstInfo mutuals
+  defs <- liftTCM $ mapM getConstInfo mutuals
 
   unless (all isFunction defs) $
     fail "only mutually defined functions are supported."
 
   -- the mutual functions that we actually compile
   -- (so no with-generated functions, etc...)
-  let mdefs = filter shouldCompileFunction defs
+  let mdefs  = filter shouldCompileFunction defs
+  let mnames = map defName mdefs
+
+  -- make sure that all mutuals get compiled
+  mapM requireDef mnames
 
   -- if the function is not recursive, just compile the body
   if null mdefs then Just. LBox.ConstantDecl . Just <$> compileFunctionBody [] defn
 
   -- otherwise, take fixpoint
   else do
-
-    let mnames = map defName mdefs
     let k = fromMaybe 0 $ elemIndex (defName defn) mnames
 
     Just . LBox.ConstantDecl . Just . flip LBox.LFix k <$>

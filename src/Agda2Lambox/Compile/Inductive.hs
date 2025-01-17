@@ -24,13 +24,14 @@ import Agda.Utils.Monad ( unlessM )
 
 import Agda.Utils ( isDataOrRecDef )
 import Agda2Lambox.Compile.Utils
+import Agda2Lambox.Compile.Monad
 import LambdaBox qualified as LBox
 
 
 -- | Toplevel conversion from a datatype/record definition to a Lambdabox declaration.
-compileInductive :: Definition -> TCM (Maybe LBox.GlobalDecl)
+compileInductive :: Definition -> CompileM (Maybe LBox.GlobalDecl)
 compileInductive defn@Defn{defName} = do
-  mutuals <- dataOrRecDefMutuals defn
+  mutuals <- liftTCM $ dataOrRecDefMutuals defn
 
   {- NOTE(flupe):
      if mutuals is []:
@@ -43,6 +44,9 @@ compileInductive defn@Defn{defName} = do
 
   let items = fromMaybe (NEL.singleton defName) $ NEL.nonEmpty mutuals
 
+  -- ensure that all mutuals get compiled, eventually
+  mapM requireDef items
+
   {- also note that we assume the list of mutuals will be the same
      for every record/datatype in the list (especially the order),
      as we make the first item in the list responsible for compiling all of them. -}
@@ -52,12 +56,12 @@ compileInductive defn@Defn{defName} = do
     pure Nothing
 
   else do
-    defs <- mapM getConstInfo items
+    defs <- liftTCM $ mapM getConstInfo items
 
     unless (all (isDataOrRecDef . theDef) defs) $
       fail "mutually-defined datatypes/records *and* functions not supported."
 
-    bodies <- forM defs actuallyConvertInductive
+    bodies <- liftTCM $ forM defs actuallyConvertInductive
 
     return $ Just $ LBox.InductiveDecl $ LBox.MutualInductive
       { indFinite = LBox.Finite -- TODO(flupe)
