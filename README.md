@@ -42,7 +42,7 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 - [ ] "Support" modules
 - [ ] Check support for Agda-specific edge cases
   - [x] Pattern-matching lambdas
-  - [ ] With-generated lambdas
+  - [x] With-generated lambdas
   - [ ] Module applications
   - [ ] Projection-like
 - [ ] Support literals (ints and floats)
