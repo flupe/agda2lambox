@@ -9,54 +9,20 @@ import Control.Monad ( filterM )
 import Control.Arrow ( first )
 
 import Data.List ( partition )
-import qualified Data.List.NonEmpty as NE ( fromList )
 import Data.Maybe ( isJust, isNothing )
 import Data.Bifunctor ( second )
 
-import Agda.Lib
-import Agda.TypeChecking.Free.Lazy (underBinder)
-import Agda.TypeChecking.Datatypes (getConstructorInfo, ConstructorInfo(..))
+import Agda.Compiler.Backend ( getUniqueCompilerPragma )
+import Agda.Syntax.Abstract.Name
+import Agda.TypeChecking.Monad.Base hiding ( conArity )
+import Agda.TypeChecking.Datatypes ( getConstructorInfo, ConstructorInfo(..) )
+import Agda.TypeChecking.Substitute ( raise )
+import Agda.Syntax.Common.Pretty
+import Agda.Syntax.Treeless
 
--- ** useful monad constraint kinds
-
-type MonadIOEnv m = (MonadIO m, MonadTCEnv m)
-type PureEnvTCM m = (PureTCM m, ReadTCState m, HasConstInfo m, MonadIOEnv m)
-
--- ** pretty-printing
 
 pp :: Pretty a => a -> String
 pp = prettyShow
-
-ppm :: (MonadPretty m, PrettyTCM a) => a -> m Doc
-ppm = prettyTCM
-
-prender :: Doc -> String
-prender = renderStyle (Style OneLineMode 0 0.0)
-
-pinterleave :: (Applicative m, Semigroup (m Doc)) => m Doc -> [m Doc] -> m Doc
-pinterleave sep = fsep . punctuate sep
-
-pbindings :: (MonadPretty m, PrettyTCM a) => [(String, a)] -> [m Doc]
-pbindings = map $ \(n, ty) -> parens $ ppm n <> " : " <> ppm ty
-
-panic :: (Pretty a, Show a) => String -> a -> b
-panic s t = error $
-  "[PANIC] unexpected " <> s <> ": " <> limit (pp t) <> "\n"
-    <> "show: " <> limit (ppShow t)
-  where limit = take 500
-
--- ** typechecking context
-
-currentCtx :: MonadTCEnv m => m [(String, Type)]
-currentCtx = fmap (first pp . unDom) <$> getContext
-
-reportCurrentCtx :: (MonadIO m, MonadTCEnv m) => m ()
-reportCurrentCtx = do
-  ctx <- currentCtx
-  liftIO $ putStrLn $ " currentCtx: " <> pp ctx
-
-unqual :: QName -> String
-unqual = pp . last . qnameToList0
 
 hasPragma :: QName -> TCM Bool
 hasPragma qn = isJust <$> getUniqueCompilerPragma "AGDA2LAMBOX" qn

@@ -11,7 +11,6 @@ import Control.Monad.Reader ( ReaderT(runReaderT), local )
 import Data.List ( elemIndex, foldl' )
 import Data.Maybe ( fromMaybe, listToMaybe )
 
-import Agda (TCM , liftTCM, MonadTCEnv, MonadTCM)
 import Agda.Compiler.Backend ( MonadTCState, HasOptions )
 import Agda.Compiler.Backend ( getConstInfo, theDef, pattern Datatype, dataMutual )
 import Agda.Syntax.Abstract.Name ( ModuleName(..), QName(..) )
@@ -19,6 +18,7 @@ import Agda.Syntax.Common ( Erased(..) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Treeless ( TTerm(..), TAlt(..), CaseInfo(..), CaseType(..) )
 import Agda.TypeChecking.Datatypes ( getConstructorData, getConstructors )
+import Agda.TypeChecking.Monad.Base ( TCM , liftTCM, MonadTCEnv, MonadTCM )
 
 import LambdaBox ( Term(..) )
 import LambdaBox qualified as LBox

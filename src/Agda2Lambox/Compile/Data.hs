@@ -11,7 +11,6 @@ import Data.Foldable ( toList )
 import Data.List ( elemIndex )
 import Data.Maybe ( isJust, listToMaybe )
 
-import Agda ( liftTCM )
 import Agda.Syntax.Abstract.Name ( qnameModule, qnameName )
 import Agda.TypeChecking.Monad.Base
 import Agda.TypeChecking.Monad.Env ( withCurrentModule )

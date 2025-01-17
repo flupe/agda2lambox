@@ -8,15 +8,15 @@ import Control.Monad ( forM, when )
 import Data.List ( elemIndex )
 import Data.Maybe ( isNothing, fromMaybe )
 
-import Agda.Lib ( (^.), funInline )
 import Agda.Syntax.Abstract.Name ( QName, qnameModule )
 import Agda.TypeChecking.Monad.Base
 import Agda.Compiler.ToTreeless ( toTreeless )
-import Agda.Compiler.Backend ( getConstInfo )
+import Agda.Compiler.Backend ( getConstInfo, funInline )
 import Agda.Syntax.Treeless ( EvaluationStrategy(EagerEvaluation) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Common ( hasQuantityω )
 import Agda.Utils.Monad (guardWithError)
+import Agda.Utils.Lens ( (^.) )
 
 import Agda.Utils ( etaExpandCtor )
 import Agda2Lambox.Compile.Utils

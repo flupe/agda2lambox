@@ -15,9 +15,7 @@ source-repository head
 executable agda2lambox
   hs-source-dirs:      src
   main-is:             Main.hs
-  other-modules:       Agda,
-                       Agda.Lib,
-                       Agda.Utils,
+  other-modules:       Agda.Utils,
                        Agda2Lambox.Compile.Utils,
                        Agda2Lambox.Compile.Term,
                        Agda2Lambox.Compile.Function,

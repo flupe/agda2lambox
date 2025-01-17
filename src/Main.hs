@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 -- | The agda2lambox Agda backend
-module Main where
+module Main (main) where
 
 import Control.Monad ( unless )
 import Control.Monad.IO.Class ( liftIO )
@@ -16,9 +16,14 @@ import System.FilePath ( (</>) )
 
 import Paths_agda2lambox ( version )
 
-import Agda.Lib
-import Agda.Utils ( pp, hasPragma )
+import Agda.Compiler.Common
+import Agda.Compiler.Backend
+import Agda.Main ( runAgda )
+import Agda.Syntax.TopLevelModuleName ( TopLevelModuleName, moduleNameToFileName )
+import Agda.Syntax.Common.Pretty ( pretty, prettyShow )
+import Agda.Utils.Monad ( whenM )
 
+import Agda.Utils ( pp, hasPragma )
 import Agda2Lambox.Compile.Function ( compileFunction )
 import Agda2Lambox.Compile.Data     ( compileData     )
 import Agda2Lambox.Compile.Record   ( compileRecord   )
