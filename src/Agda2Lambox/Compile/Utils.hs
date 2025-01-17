@@ -2,6 +2,8 @@
 module Agda2Lambox.Compile.Utils
   ( modNameToModPath
   , qnameToKName
+  , dataOrRecDefMutuals
+  , dataOrRecMutuals
   , toInductive
   , toConApp
   ) where
@@ -14,7 +16,7 @@ import Agda.Syntax.Abstract.Name
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.TypeChecking.Datatypes ( getConstructors, getConstructorData )
 import Agda.TypeChecking.Monad.Base ( TCM )
-import Agda.Compiler.Backend ( pattern Datatype, pattern Record, recMutual, dataMutual, getConstInfo, theDef )
+import Agda.Compiler.Backend 
 
 import LambdaBox qualified as LBox
 
@@ -31,14 +33,15 @@ qnameToKName qn =
     (modNameToModPath $ qnameModule qn)
     (prettyShow $ qnameName qn)
 
-
-dataOrRecMutuals :: QName -> TCM [QName]
-dataOrRecMutuals q = do
-  defn <- theDef <$> getConstInfo q
-  case defn of
+dataOrRecDefMutuals :: Definition -> TCM [QName]
+dataOrRecDefMutuals d = do
+  case theDef d of
     Datatype{dataMutual} -> pure $ fromMaybe [] dataMutual
     Record  {recMutual}  -> pure $ fromMaybe [] recMutual
     _                    -> fail "not a datatype or record"
+
+dataOrRecMutuals :: QName -> TCM [QName]
+dataOrRecMutuals q = dataOrRecDefMutuals =<< getConstInfo q
 
 -- | Fetch the λ□ inductive associated with a @QName@.
 toInductive :: QName -> TCM LBox.Inductive

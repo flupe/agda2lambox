@@ -3,14 +3,9 @@
 -- | Agda utilities.
 module Agda.Utils where
 
-import Control.Monad.Error.Class ( MonadError )
-import Control.Monad.IO.Class ( MonadIO(liftIO) )
-import Control.Monad ( filterM )
-import Control.Arrow ( first )
-
-import Data.List ( partition )
-import Data.Maybe ( isJust, isNothing )
+import Control.Applicative ( liftA2 )
 import Data.Bifunctor ( second )
+import Data.Maybe ( isJust, isNothing )
 
 import Agda.Compiler.Backend ( getUniqueCompilerPragma )
 import Agda.Syntax.Abstract.Name
@@ -21,12 +16,28 @@ import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Treeless
 
 
+-- * Miscellaneous
+
 pp :: Pretty a => a -> String
 pp = prettyShow
 
 hasPragma :: QName -> TCM Bool
 hasPragma qn = isJust <$> getUniqueCompilerPragma "AGDA2LAMBOX" qn
 
+isDataDef, isRecDef, isFunDef, isDataOrRecDef :: Defn -> Bool
+isDataDef = \case
+  Datatype{} -> True
+  _ -> False
+
+isRecDef = \case
+  Record{} -> True
+  _ -> False
+
+isFunDef = \case
+  Function{} -> True
+  _ -> False
+
+isDataOrRecDef = liftA2 (||) isDataDef isRecDef
 
 -- ** eta-expansion of constructors
 
@@ -382,18 +393,6 @@ isNullary ty = null . filter hasQuantityNon0 . fst <$> telListView ty
 
 -- ** definitions
 
-isDataDef, isRecDef, isFunDef :: Defn -> Bool
-isDataDef = \case
-  Datatype{} -> True
-  _ -> False
-
-isRecDef = \case
-  Record{} -> True
-  _ -> False
-
-isFunDef = \case
-  Function{} -> True
-  _ -> False
 
 funCC :: (MonadTCM m, HasConstInfo m) => QName -> m CompiledClauses
 funCC q = do

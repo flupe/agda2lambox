@@ -31,13 +31,13 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 - [x] Evaluate λ□ programs from inside Coq to start testing
   - [x] Using the λ□-Mut from CertiCoq
 - [x] Support mutual inductives
-- [ ] Refactor backend
+- [x] Refactor backend
   - Get rid of the Convert class.
   - Possibly put everything in a single module.
   - Unify compilation of records and datatypes.
 - [x] Support (one-inductive) records
   - [x] Properly translate projections in terms (by actually generating projections)
-- [ ] Support mutual (possibly inductive) records
+- [x] Support mutual (possibly inductive) records
 - [ ] Better error-reporting
 - [ ] "Support" modules
 - [ ] Check support for Agda-specific edge cases

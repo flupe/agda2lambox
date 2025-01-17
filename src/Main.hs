@@ -23,10 +23,9 @@ import Agda.Syntax.TopLevelModuleName ( TopLevelModuleName, moduleNameToFileName
 import Agda.Syntax.Common.Pretty ( pretty, prettyShow )
 import Agda.Utils.Monad ( whenM )
 
-import Agda.Utils ( pp, hasPragma )
-import Agda2Lambox.Compile.Function ( compileFunction )
-import Agda2Lambox.Compile.Data     ( compileData     )
-import Agda2Lambox.Compile.Record   ( compileRecord   )
+import Agda.Utils ( pp, hasPragma, isDataOrRecDef )
+import Agda2Lambox.Compile.Function  ( compileFunction  )
+import Agda2Lambox.Compile.Inductive ( compileInductive )
 import CoqGen    ( ToCoq(ToCoq) )
 import LambdaBox ( KerName, GlobalDecl, qnameToKerName, CoqModule(..) )
 
@@ -96,18 +95,16 @@ compileDefinition opts menv _ def@Defn{..} =
     case theDef of
 
       Function{} -> do
-          -- if the function is annotated with a COMPILE pragma
-          -- then it is added to the list of programs to run
-          whenM (hasPragma defName) $ 
-            liftIO $ modifyIORef' (modProgs menv) (qnameToKerName defName:)
+        -- if the function is annotated with a COMPILE pragma
+        -- then it is added to the list of programs to run
+        whenM (hasPragma defName) $ 
+          liftIO $ modifyIORef' (modProgs menv) (qnameToKerName defName:)
 
-          compileFunction def
+        compileFunction def
 
-      Datatype{} -> compileData def
+      d | isDataOrRecDef d -> compileInductive def
 
-      Record{}   -> Just <$> compileRecord def
-
-      _          -> Nothing <$ (liftIO $ putStrLn $ "Skipping " <> prettyShow defName)
+      _ -> Nothing <$ (liftIO $ putStrLn $ "Skipping " <> prettyShow defName)
 
 
 -- | Collect global definitions and programs in a module
