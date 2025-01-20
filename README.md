@@ -18,7 +18,7 @@ make -f CoqMakefile
 cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 ```
 
-## Implemented
+## Status
 
 - Compilation to untyped λ□ programs:
   - Mutually-defined datatypes and record types.
@@ -26,6 +26,13 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
   - Importing modules.
     The backend transitively compiles all required definitions, and only those.
   - Nat literals.
+
+- Compilation to typed λ□ programs:
+  - Compile function types.
+  - [ ] Type of constructors.
+  - [ ] Type of projections.
+  - [ ] Type aliases.
+  - [ ] CertiCoq/MetaCoq type-checker on generated environments?
 
 ## TODO
 

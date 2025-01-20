@@ -145,13 +145,13 @@ instance Pretty (ToCoq t (ConstructorBody t)) where
                , ("cstr_nargs", pcoq t cstrArgs)
                ]
       ToTyped   ->
-        pcoq t (pcoq t cstrName, (pcoq t (extract cstrTypes), pcoq t cstrArgs))
+        pcoq t ((cstrName, extract cstrTypes), cstrArgs)
 
 instance Pretty (ToCoq t (ProjectionBody t)) where
   pretty (ToCoq t Projection{..}) =
     case t of
-      ToUntyped -> record [ ("proj_name",  pcoq t projName) ]
-      ToTyped   -> pcoq t (pcoq t projName, pcoq t $ extract projType)
+      ToUntyped -> record [("proj_name",  pcoq t projName)]
+      ToTyped   -> pcoq t (projName, extract projType)
 
 instance Pretty (ToCoq t TypeVarInfo) where
   pretty (ToCoq t TypeVarInfo{..}) =
@@ -204,10 +204,10 @@ instance Pretty (ToCoq t (GlobalEnv t)) where
   pretty (ToCoq t (GlobalEnv env)) =
     case t of
       ToUntyped -> pcoq t env
-      ToTyped   -> pcoq t $ flip map env \(kn, decl) -> (kn, (True, decl))
+      ToTyped   -> pcoq t $ flip map env \(kn, decl) -> ((kn, True), decl)
 
 instance Pretty (ToCoq t (CoqModule t)) where
-  pretty (ToCoq t CoqModule{..}) = vsep
+  pretty (ToCoq t@ToUntyped CoqModule{..}) = vsep
     [ vcat
         [ "From Coq             Require Import List."
         , "From MetaCoq.Common  Require Import BasicAst Kernames Universes."
@@ -229,4 +229,17 @@ instance Pretty (ToCoq t (CoqModule t)) where
             <> "."
         , "Compute eval_program " <> progname <> "."
         ]
+    ]
+
+  pretty (ToCoq t@ToTyped CoqModule{..}) = vsep
+    [ vcat
+        [ "From Coq             Require Import List."
+        , "From MetaCoq.Common  Require Import BasicAst Kernames Universes."
+        , "From MetaCoq.Utils   Require Import bytestring."
+        , "From MetaCoq.Erasure Require Import EAst ExAst."
+        , "From Agda2Lambox     Require Import CheckWF Eval."
+        , "Import ListNotations."
+        ]
+
+    , hang "Definition env : global_env :=" 2 $ pcoq t coqEnv <> "."
     ]

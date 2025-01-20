@@ -24,6 +24,7 @@ import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
 import Agda2Lambox.Compile.Term ( compileTerm )
+import Agda2Lambox.Compile.Type ( compileType )
 
 import LambdaBox qualified as LBox
 import LambdaBox.Env
@@ -53,7 +54,7 @@ shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
 -- | Convert a function definition to a λ□ declaration.
 compileFunction :: Target t -> Definition -> CompileM (Maybe (LBox.GlobalDecl t))
 compileFunction t defn | not (shouldCompileFunction defn) = return Nothing
-compileFunction t defn@Defn{theDef} = do
+compileFunction t defn@Defn{theDef, defType} = do
   let Function{funMutual = Just mutuals} = theDef
 
   defs <- liftTCM $ mapM getConstInfo mutuals
@@ -66,15 +67,18 @@ compileFunction t defn@Defn{theDef} = do
   let mdefs  = filter shouldCompileFunction defs
   let mnames = map defName mdefs
 
+  -- TODO(flupe): enforce that compilation only happend when t is Typed
+  typ <- liftTCM $ whenTyped t . ([],) <$> compileType defType
+
   -- if the function is not recursive, just compile the body
   if null mdefs then
-    Just . ConstantDecl . ConstantBody (catchall t LBox.TBox) . Just <$> compileFunctionBody [] defn
+    Just . ConstantDecl . ConstantBody typ . Just <$> compileFunctionBody [] defn
 
   -- otherwise, take fixpoint
   else do
     let k = fromMaybe 0 $ elemIndex (defName defn) mnames
 
-    Just . ConstantDecl . ConstantBody (catchall t LBox.TBox) . Just . flip LBox.LFix k <$>
+    Just . ConstantDecl . ConstantBody typ . Just . flip LBox.LFix k <$>
       forM mdefs \def@Defn{defName} -> do
         body <- compileFunctionBody mnames def
         return LBox.Def
