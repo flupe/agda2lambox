@@ -12,7 +12,7 @@ data List (A : Set) : Set where
   _::_ : A -> List A -> List A
 
 xs : List Nat
-xs = zero :: succ zero :: succ (succ zero) :: []
+xs = zero :: []
 
 map : {A B : Set} -> (A -> B) -> List A -> List B
 map f [] = []

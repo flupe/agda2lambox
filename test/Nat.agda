@@ -1,21 +1,21 @@
-data Nat : Set where
-  zero : Nat
-  succ : Nat → Nat
+open import Agda.Builtin.Nat
 
 one : Nat
-one = succ zero
+one = suc zero
 
+{-
 add : Nat → Nat → Nat
 add zero y = y
-add (succ x) y = succ (add x y)
+add (suc x) y = suc (add x y)
 
 incr : Nat → Nat
-incr = succ
+incr = suc
 
 deux trois : Nat
-deux  = succ (succ zero)
-trois = succ (succ (succ zero))
+deux  = suc (suc zero)
+trois = suc (suc (suc zero))
 
 prog : Nat
 prog = add trois deux
 {-# COMPILE AGDA2LAMBOX prog #-}
+-}

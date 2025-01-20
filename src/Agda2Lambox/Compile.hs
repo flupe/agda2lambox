@@ -20,10 +20,8 @@ import Agda2Lambox.Compile.Inductive ( compileInductive )
 import LambdaBox
 
 
-compileDefinition :: QName -> CompileM (Maybe (KerName, GlobalDecl))
-compileDefinition q = do
-  defn@Defn{..} <- liftTCM $ getConstInfo q
-
+compileDefinition :: Definition -> CompileM (Maybe (KerName, GlobalDecl))
+compileDefinition defn@Defn{..} = do
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
       Constructor{conData} -> Nothing <$ requireDef conData

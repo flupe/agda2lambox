@@ -3,7 +3,6 @@
 module Agda2Lambox.Compile.Monad
   ( CompileM
   , requireDef
-  , compile
   , compileLoop
   ) where
 
@@ -15,8 +14,8 @@ import Data.Set qualified as Set
 import Queue.Ephemeral ( EphemeralQueue(..) )
 import Queue.Ephemeral qualified as Queue
 
-import Agda.Syntax.Internal ( QName )
-import Agda.TypeChecking.Monad.Base ( TCM, MonadTCEnv, MonadTCM, MonadTCState, MonadTCEnv, HasOptions )
+import Agda.Compiler.Backend ( QName, Definition, getConstInfo )
+import Agda.TypeChecking.Monad.Base ( TCM, MonadTCEnv, MonadTCM(liftTCM), MonadTCState, MonadTCEnv, HasOptions )
 import Agda.Utils.List ( mcons )
 
 -- | Backend compilation state.
@@ -32,11 +31,11 @@ data CompileState = CompileState
 --   i.e try to compile "related" definitions together.
 -- - We use an EphemeralQueue because we don't rely on persistence at all.
 
--- | Initial compile state. Empty queue, no name is known.
-initState :: CompileState
-initState = CompileState
-  { seenDefs     = Set.empty
-  , compileQueue = Queue.empty
+-- | Initial compile state, with a set of names required for compilation.
+initState :: [QName] -> CompileState
+initState qs = CompileState
+  { seenDefs     = Set.fromList qs
+  , compileQueue = Queue.fromList qs
   }
 
 -- | Backend compilation monad.
@@ -47,10 +46,6 @@ newtype CompileM a = Compile (StateT CompileState TCM a)
 
 -- deriving newtype (MonadState CompileState)
 -- NOTE(flupe): safe to not export this, to make sure the queue is indeed ephemeral
-
--- | Run a compilation unit in TCM.
-compile :: CompileM a -> TCM a
-compile (Compile c) = evalStateT c initState
 
 -- | Require a definition to be compiled.
 requireDef :: QName -> CompileM ()
@@ -71,8 +66,14 @@ nextUnit = Compile $
     Full q queue -> Just q <$ modify \s -> s { compileQueue = queue }
 
 -- | Run the processing function as long as there are names to be compiled.
-compileLoop :: (QName -> CompileM (Maybe a)) -> CompileM [a]
-compileLoop step =
-  nextUnit >>= \case
+compileLoop
+  :: (Definition -> CompileM (Maybe a)) -- ^ The compilation function
+  -> [QName]                            -- ^ Names to compile
+  -> TCM [a]
+compileLoop step = evalStateT unloop . initState
+  where
+  loop@(Compile unloop) = nextUnit >>= \case
     Nothing -> pure []
-    Just q  -> mcons <$> step q <*> compileLoop step
+    Just q  -> do
+      mr <- step =<< (liftTCM $ getConstInfo q)
+      mcons mr <$> loop

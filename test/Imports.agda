@@ -1,4 +1,5 @@
 open import Agda.Builtin.Bool
+open import Agda.Builtin.List
 
-test : Bool
-test = true
+test : List Bool
+test = true ∷ false ∷ []

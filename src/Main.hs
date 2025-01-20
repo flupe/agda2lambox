@@ -2,7 +2,7 @@
 -- | The agda2lambox Agda backend
 module Main (main) where
 
-import Control.Monad ( unless, when, forM_ )
+import Control.Monad ( unless, when, forM_, filterM )
 import Control.Monad.IO.Class ( liftIO )
 import Control.DeepSeq ( NFData )
 import Data.Function ( (&) )
@@ -25,15 +25,14 @@ import Agda.Utils.Monad ( whenM )
 
 import Agda.Utils ( pp, hasPragma, isDataOrRecDef )
 import Agda2Lambox.Compile.Utils (qnameToKName)
-import Agda2Lambox.Compile.Monad (compile, compileLoop, requireDef)
-import Agda2Lambox.Compile (compileDefinition)
+import Agda2Lambox.Compile.Monad (compileLoop)
+import Agda2Lambox.Compile       (compileDefinition)
 import CoqGen    ( ToCoq(ToCoq) )
 import LambdaBox ( KerName, GlobalDecl, qnameToKerName, CoqModule(..) )
 
 
 main :: IO ()
 main = runAgda [agda2lambox]
-
 
 -- | Backend options.
 data Options = Options { optOutDir :: Maybe FilePath }
@@ -48,11 +47,7 @@ defaultOptions :: Options
 defaultOptions = Options { optOutDir = Nothing }
 
 -- | Backend module environments.
-data ModuleEnv = ModuleEnv
-  { modProgs :: IORef [QName]
-     -- ^ Names of programs to extract in a module
-  }
-
+type ModuleEnv = ()
 type ModuleRes = ()
 
 -- | The adga2lambox backend.
@@ -73,7 +68,7 @@ agda2lambox = Backend backend
       , postCompile           = \ _ _ _ -> return ()
       , preModule             = moduleSetup
       , postModule            = writeModule
-      , compileDef            = compileDef'
+      , compileDef            = \ _ _ _ -> pure . defName
       , scopeCheckingSuffices = False
       , mayEraseType          = \ _ -> return True
       }
@@ -84,36 +79,18 @@ moduleSetup
   -> TCM (Recompile ModuleEnv ModuleRes)
 moduleSetup _ _ m _ = do
   setScope . iInsideScope =<< curIF
-  Recompile . ModuleEnv <$> liftIO (newIORef [])
+  pure $ Recompile ()
 
 
-compileDef'
-  :: Options -> ModuleEnv -> IsMain
-  -> Definition
-  -> TCM QName
-compileDef' opts menv ismain Defn{defName} = do
-  -- if it has a pragma, that's a program!
-  when (ismain == IsMain) $
-    whenM (hasPragma defName) $
-      liftIO $ modifyIORef' (modProgs menv) (defName :)
-
-  pure defName
-
-
--- | Collect global definitions and programs in a module
--- and write them to disk.
 writeModule
   :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
   -> [QName]
   -> TCM ModuleRes
-writeModule opts menv NotMain _ _ = pure ()
+writeModule opts menv NotMain _ _   = pure ()
 writeModule opts menv IsMain m defs = do
-  programs   <- liftIO $ readIORef $ modProgs menv
-  outDir     <- flip fromMaybe (optOutDir opts) <$> compileDir
-
-  decls <- compile do
-    forM_ (reverse defs) requireDef
-    compileLoop compileDefinition
+  programs <- filterM hasPragma defs
+  outDir   <- flip fromMaybe (optOutDir opts) <$> compileDir
+  decls    <- compileLoop compileDefinition $ reverse defs
 
   liftIO $ createDirectoryIfMissing True outDir
 
