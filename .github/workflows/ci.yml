@@ -12,34 +12,50 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.os }} / ghc ${{ matrix.ghc }}
+    name: ${{ matrix.os }} / GHC ${{ matrix.ghc }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         cabal: [3.12.1]
         ghc: [9.10.1]
 
     steps:
-    - uses: actions/checkout@v3
-      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
+      - uses: actions/checkout@v4
 
-    - name: Install Haskell
-      uses: haskell-actions/setup@v2
-      id: setup-haskell-cabal
-      with:
-        ghc-version: ${{ matrix.ghc }}
-        cabal-version: ${{ matrix.cabal }}
+      - name: Set up GHC ${{ matrix.ghc }}
+        uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: ${{ matrix.cabal }}
 
-    - name: Freeze cabal dependencies
-      run: cabal freeze
+      - name: Configure the build
+        run: |
+          cabal configure --disable-documentation
+          cabal build all --dry-run
 
-    - name: Cache cabal store
-      uses: actions/cache@v3
-      with:
-        path:         ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
-        key:          ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('cabal.project.freeze') }}
-        restore-keys: ${{ runner.os }}-${{ matrix.ghc }}-
+      - name: Restore cached dependencies
+        uses: actions/cache/restore@v4
+        id: cache
+        env:
+          key: ${{ runner.os }}-${{ matrix.ghc }}-${{ matrix.cabal }}
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key:  ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
+          restore-keys: ${{ env.key }}-
 
-    - name: Build
-      run: cabal build
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cabal build all --only-dependencies
+
+      - name: Save cached dependencies
+        uses: actions/cache/save@v4
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key:  ${{ steps.cache.outputs.cache-primary-key }}
+
+      - name: Build
+        run: cabal build
