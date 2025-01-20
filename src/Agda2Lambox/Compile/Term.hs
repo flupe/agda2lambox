@@ -24,6 +24,7 @@ import Agda.TypeChecking.Datatypes ( getConstructorData, getConstructors )
 import Agda.TypeChecking.Monad.Base ( TCM , liftTCM, MonadTCEnv, MonadTCM )
 import Agda.TypeChecking.Monad.Builtin ( getBuiltinName_ )
 
+import LambdaBox.Names ( Name(..) )
 import LambdaBox ( Term(..) )
 import LambdaBox qualified as LBox
 import Agda2Lambox.Compile.Utils
@@ -105,12 +106,12 @@ compileTermC = \case
     ces <- traverse compileTermC es
     pure $ foldl' LApp cu ces
 
-  TLam t -> underBinder $ LLam <$> compileTermC t
+  TLam t -> underBinder $ LLambda Anon <$> compileTermC t
 
   TLit l -> compileLit l
 
-  TLet u v -> LLet <$> compileTermC u
-                   <*> underBinder (compileTermC v)
+  TLet u v -> LLetIn Anon <$> compileTermC u
+                          <*> underBinder (compileTermC v)
 
   TCase n CaseInfo{..} dt talts ->
     case caseErased of

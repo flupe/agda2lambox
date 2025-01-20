@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, ImportQualifiedPost #-}
+{-# LANGUAGE NamedFieldPuns, ImportQualifiedPost, DataKinds #-}
 -- | Convert Agda datatypes to λ□ inductive declarations
 module Agda2Lambox.Compile.Inductive
   ( compileInductive
@@ -14,7 +14,7 @@ import Data.Maybe ( isJust, listToMaybe, fromMaybe )
 import Data.Traversable ( mapM )
 
 import Agda.Syntax.Abstract.Name ( qnameModule, qnameName )
-import Agda.TypeChecking.Monad.Base
+import Agda.TypeChecking.Monad.Base hiding (None)
 import Agda.TypeChecking.Monad.Env ( withCurrentModule )
 import Agda.TypeChecking.Datatypes ( ConstructorInfo(..), getConstructorInfo, isDatatype )
 import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock )
@@ -23,13 +23,14 @@ import Agda.Syntax.Internal ( ConHead(..), unDom )
 import Agda.Utils.Monad ( unlessM )
 
 import Agda.Utils ( isDataOrRecDef )
+import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
 import LambdaBox qualified as LBox
 
 
 -- | Toplevel conversion from a datatype/record definition to a Lambdabox declaration.
-compileInductive :: Definition -> CompileM (Maybe LBox.GlobalDecl)
+compileInductive :: Definition -> CompileM (Maybe (LBox.GlobalDecl Untyped))
 compileInductive defn@Defn{defName} = do
   mutuals <- liftTCM $ dataOrRecDefMutuals defn
 
@@ -69,16 +70,17 @@ compileInductive defn@Defn{defName} = do
       , indBodies = NEL.toList bodies
       }
 
-actuallyConvertInductive :: Definition -> TCM LBox.OneInductiveBody
+actuallyConvertInductive :: Definition -> TCM (LBox.OneInductiveBody Untyped)
 actuallyConvertInductive Defn{defName, theDef, defMutual} = case theDef of
   Datatype{..} -> do
 
-    ctors :: [LBox.ConstructorBody]
+    ctors :: [LBox.ConstructorBody Untyped]
       <- forM dataCons \cname -> do
            DataCon arity <- getConstructorInfo cname
-           return LBox.Ctor
-             { ctorName = prettyShow $ qnameName cname
-             , ctorArgs = arity
+           return LBox.Constructor
+             { cstrName  = prettyShow $ qnameName cname
+             , cstrArgs  = arity
+             , cstrTypes = None
              }
 
     pure LBox.OneInductive
@@ -87,19 +89,23 @@ actuallyConvertInductive Defn{defName, theDef, defMutual} = case theDef of
       , indKElim         = LBox.IntoAny -- TODO(flupe)
       , indCtors         = ctors
       , indProjs         = []
+      , indTypeVars      = None
       }
 
   Record{..} -> do
 
     let ConHead{conName, conFields} = recConHead
-        fields :: [LBox.ProjectionBody] = LBox.Proj . prettyShow . qnameName . unDom <$> recFields
+        fields :: [LBox.ProjectionBody Untyped] =
+          flip LBox.Projection None . prettyShow . qnameName . unDom <$> recFields
 
     pure LBox.OneInductive
       { indName          = prettyShow $ qnameName defName
       , indPropositional = False        -- TODO(flupe)
       , indKElim         = LBox.IntoAny -- TODO(flupe)
-      , indCtors         = [ LBox.Ctor (prettyShow $ qnameName conName) (length conFields) ]
+      , indCtors         = 
+          [ LBox.Constructor (prettyShow $ qnameName conName) (length conFields) None ]
       , indProjs         = fields
+      , indTypeVars      = None
       }
 
   -- { indFinite = maybe LBox.BiFinite inductionToRecKind recInduction

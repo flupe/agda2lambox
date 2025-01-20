@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NamedFieldPuns, DataKinds #-}
 -- | Convert Agda functions to λ□ constant declarations
 module Agda2Lambox.Compile.Function 
   ( compileFunction
@@ -10,7 +10,7 @@ import Data.List ( elemIndex )
 import Data.Maybe ( isNothing, fromMaybe )
 
 import Agda.Syntax.Abstract.Name ( QName, qnameModule )
-import Agda.TypeChecking.Monad.Base
+import Agda.TypeChecking.Monad.Base hiding ( None )
 import Agda.Compiler.ToTreeless ( toTreeless )
 import Agda.Compiler.Backend ( getConstInfo, funInline )
 import Agda.Syntax.Treeless ( EvaluationStrategy(EagerEvaluation) )
@@ -20,10 +20,13 @@ import Agda.Utils.Monad (guardWithError, whenM)
 import Agda.Utils.Lens ( (^.) )
 
 import Agda.Utils ( etaExpandCtor, treeless, pp )
+import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
 import Agda2Lambox.Compile.Term ( compileTerm )
+
 import LambdaBox qualified as LBox
+import LambdaBox.Env
 
 
 -- | Check whether a definition is a function.
@@ -49,7 +52,7 @@ shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
 
 
 -- | Convert a function definition to a λ□ declaration.
-compileFunction :: Definition -> CompileM (Maybe LBox.GlobalDecl)
+compileFunction :: Definition -> CompileM (Maybe (LBox.GlobalDecl Untyped))
 compileFunction defn | not (shouldCompileFunction defn) = return Nothing
 compileFunction defn@Defn{theDef} = do
   let Function{funMutual = Just mutuals} = theDef
@@ -65,13 +68,14 @@ compileFunction defn@Defn{theDef} = do
   let mnames = map defName mdefs
 
   -- if the function is not recursive, just compile the body
-  if null mdefs then Just. LBox.ConstantDecl . Just <$> compileFunctionBody [] defn
+  if null mdefs then
+    Just . ConstantDecl . ConstantBody None . Just <$> compileFunctionBody [] defn
 
   -- otherwise, take fixpoint
   else do
     let k = fromMaybe 0 $ elemIndex (defName defn) mnames
 
-    Just . LBox.ConstantDecl . Just . flip LBox.LFix k <$>
+    Just . ConstantDecl . ConstantBody None . Just . flip LBox.LFix k <$>
       forM mdefs \def@Defn{defName} -> do
         body <- compileFunctionBody mnames def
         return LBox.Def

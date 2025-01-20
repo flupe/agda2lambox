@@ -16,6 +16,7 @@ executable agda2lambox
   hs-source-dirs:      src
   main-is:             Main.hs
   other-modules:       Agda.Utils,
+                       Agda2Lambox.Compile.Target,
                        Agda2Lambox.Compile.Utils,
                        Agda2Lambox.Compile.Monad,
                        Agda2Lambox.Compile.Term,
@@ -23,6 +24,10 @@ executable agda2lambox
                        Agda2Lambox.Compile.Inductive,
                        Agda2Lambox.Compile.Type,
                        Agda2Lambox.Compile,
+                       LambdaBox.Names,
+                       LambdaBox.Term,
+                       LambdaBox.Type,
+                       LambdaBox.Env,
                        LambdaBox,
                        CoqGen,
                        Paths_agda2lambox

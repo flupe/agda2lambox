@@ -59,4 +59,5 @@ toConApp qn es = do
   ctrs <- getConstructors dt
   ind  <- toInductive dt
   let idx = fromMaybe 0 $ qn `elemIndex` ctrs
-  pure $ LBox.LCtor ind idx es
+  pure $ LBox.LConstruct ind idx es
+

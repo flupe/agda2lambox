@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NamedFieldPuns, DataKinds #-}
 module Agda2Lambox.Compile 
   ( compileDefinition
   ) where
@@ -13,14 +13,18 @@ import Agda.TypeChecking.Monad ( liftTCM, getConstInfo )
 import Agda.Utils.Monad ( whenM )
 
 import Agda.Utils ( hasPragma, isDataOrRecDef )
+
 import Agda2Lambox.Compile.Monad
+import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Function  ( compileFunction  )
 import Agda2Lambox.Compile.Inductive ( compileInductive )
-import LambdaBox
+
+import LambdaBox.Names
+import LambdaBox.Env ( GlobalDecl )
 
 
-compileDefinition :: Definition -> CompileM (Maybe (KerName, GlobalDecl))
+compileDefinition :: Definition -> CompileM (Maybe (KerName, GlobalDecl Untyped))
 compileDefinition defn@Defn{..} = do
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of

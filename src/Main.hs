@@ -1,19 +1,21 @@
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, NamedFieldPuns, OverloadedStrings #-}
+{-# LANGUAGE GADTs #-}
 -- | The agda2lambox Agda backend
 module Main (main) where
 
 import Control.Monad ( unless, when, forM_, filterM )
 import Control.Monad.IO.Class ( liftIO )
-import Control.DeepSeq ( NFData )
+import Control.DeepSeq ( NFData(rnf) )
 import Data.Function ( (&) )
 import Data.IORef ( IORef, newIORef, readIORef, modifyIORef' )
 import Data.Maybe ( fromMaybe, catMaybes )
 import Data.Version ( showVersion )
 import Data.Text ( pack )
 import GHC.Generics ( Generic )
-import System.Console.GetOpt ( OptDescr(Option), ArgDescr(ReqArg) )
+import System.Console.GetOpt ( OptDescr(Option), ArgDescr(..) )
 import System.Directory ( createDirectoryIfMissing )
 import System.FilePath ( (</>) )
+import Data.Kind (Type)
 
 import Paths_agda2lambox ( version )
 
@@ -25,7 +27,8 @@ import Agda.Syntax.Common.Pretty ( pretty, prettyShow )
 import Agda.Utils.Monad ( whenM )
 
 import Agda.Utils ( pp, hasPragma, isDataOrRecDef )
-import Agda2Lambox.Compile.Utils (qnameToKName)
+import Agda2Lambox.Compile.Target
+import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad (compileLoop)
 import Agda2Lambox.Compile       (compileDefinition)
 import CoqGen    ( ToCoq(ToCoq) )
@@ -36,16 +39,26 @@ main :: IO ()
 main = runAgda [agda2lambox]
 
 -- | Backend options.
-data Options = Options { optOutDir :: Maybe FilePath }
-  deriving (Generic, NFData)
+data Options = forall t. Options
+  { optOutDir :: Maybe FilePath
+  , optTarget :: Target t
+  }
+
+instance NFData Options where rnf (Options m t) = rnf m `seq` rnf t
 
 -- | Setter for output directory option.
 outdirOpt :: Monad m => FilePath -> Options -> m Options
 outdirOpt dir opts = return opts { optOutDir = Just dir }
 
+typedOpt :: Monad m => Options -> m Options
+typedOpt opts = return opts { optTarget = ToUntyped }
+
 -- | Default backend options.
 defaultOptions :: Options
-defaultOptions = Options { optOutDir = Nothing }
+defaultOptions = Options
+  { optOutDir = Nothing
+  , optTarget = ToTyped
+  }
 
 -- | Backend module environments.
 type ModuleEnv = ()
@@ -65,6 +78,8 @@ agda2lambox = Backend backend
       , commandLineFlags      =
           [ Option ['o'] ["out-dir"] (ReqArg outdirOpt "DIR")
             "Write output files to DIR. (default: project root)"
+          , Option ['t'] ["typed"] (NoArg typedOpt) 
+            "Compile to typed λ□ environments."
           ]
       , isEnabled             = \ _ -> True
       , preCompile            = return
