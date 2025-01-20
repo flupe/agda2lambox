@@ -5,6 +5,7 @@ module Agda2Lambox.Compile.Target
   , Target(..)
   , WhenTyped(..)
   , extract
+  , catchall
   ) where
 
 import Control.DeepSeq ( NFData(rnf) )
@@ -23,10 +24,14 @@ data WhenTyped a :: Typing -> Type where
   None ::      WhenTyped a Untyped
   Some :: a -> WhenTyped a Typed
 
--- | Attempt retrieving value.
-extract :: WhenTyped a t -> Maybe a
-extract None = Nothing
-extract (Some x) = Just x
+-- | Retrieve a value when it's there for sure.
+extract :: WhenTyped a Typed ->  a
+extract (Some x) = x
+
+-- | Wrap a default value.
+catchall :: Target t -> a -> WhenTyped a t
+catchall ToUntyped x = None
+catchall ToTyped   x = Some x
 
 instance NFData (Target t) where
   rnf ToTyped   = ()

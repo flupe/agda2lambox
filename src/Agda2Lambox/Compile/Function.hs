@@ -50,11 +50,10 @@ shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
     && isNothing funWith      -- not a with-generated function           (inlined by the treeless translation)
     && hasQuantityω def       -- non-erased
 
-
 -- | Convert a function definition to a λ□ declaration.
-compileFunction :: Definition -> CompileM (Maybe (LBox.GlobalDecl Untyped))
-compileFunction defn | not (shouldCompileFunction defn) = return Nothing
-compileFunction defn@Defn{theDef} = do
+compileFunction :: Target t -> Definition -> CompileM (Maybe (LBox.GlobalDecl t))
+compileFunction t defn | not (shouldCompileFunction defn) = return Nothing
+compileFunction t defn@Defn{theDef} = do
   let Function{funMutual = Just mutuals} = theDef
 
   defs <- liftTCM $ mapM getConstInfo mutuals
@@ -69,13 +68,13 @@ compileFunction defn@Defn{theDef} = do
 
   -- if the function is not recursive, just compile the body
   if null mdefs then
-    Just . ConstantDecl . ConstantBody None . Just <$> compileFunctionBody [] defn
+    Just . ConstantDecl . ConstantBody (catchall t LBox.TBox) . Just <$> compileFunctionBody [] defn
 
   -- otherwise, take fixpoint
   else do
     let k = fromMaybe 0 $ elemIndex (defName defn) mnames
 
-    Just . ConstantDecl . ConstantBody None . Just . flip LBox.LFix k <$>
+    Just . ConstantDecl . ConstantBody (catchall t LBox.TBox) . Just . flip LBox.LFix k <$>
       forM mdefs \def@Defn{defName} -> do
         body <- compileFunctionBody mnames def
         return LBox.Def

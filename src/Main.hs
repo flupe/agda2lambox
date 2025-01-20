@@ -29,10 +29,9 @@ import Agda.Utils.Monad ( whenM )
 import Agda.Utils ( pp, hasPragma, isDataOrRecDef )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
-import Agda2Lambox.Compile.Monad (compileLoop)
-import Agda2Lambox.Compile       (compileDefinition)
+import Agda2Lambox.Compile       (compile)
 import CoqGen    ( ToCoq(ToCoq) )
-import LambdaBox ( KerName, GlobalDecl, qnameToKerName, CoqModule(..) )
+import LambdaBox.Env
 
 
 main :: IO ()
@@ -51,7 +50,7 @@ outdirOpt :: Monad m => FilePath -> Options -> m Options
 outdirOpt dir opts = return opts { optOutDir = Just dir }
 
 typedOpt :: Monad m => Options -> m Options
-typedOpt opts = return opts { optTarget = ToUntyped }
+typedOpt opts = return opts { optTarget = ToTyped }
 
 -- | Default backend options.
 defaultOptions :: Options
@@ -105,21 +104,21 @@ writeModule
   -> [QName]
   -> TCM ModuleRes
 writeModule opts menv NotMain _ _   = pure ()
-writeModule opts menv IsMain m defs = do
+writeModule Options{..} menv IsMain m defs = do
   programs <- filterM hasPragma defs
-  outDir   <- flip fromMaybe (optOutDir opts) <$> compileDir
-  decls    <- compileLoop compileDefinition $ reverse defs
+  outDir   <- flip fromMaybe optOutDir <$> compileDir
+  env      <- compile optTarget $ reverse defs
 
   liftIO $ createDirectoryIfMissing True outDir
 
   let fileName = (outDir </>) . moduleNameToFileName m
-      coqMod   = CoqModule decls (map qnameToKName programs)
+      coqMod   = CoqModule env (map qnameToKName programs)
 
-  unless (null decls) $ liftIO do
+  liftIO do
     putStrLn $ "Writing " <> fileName ".{v,txt}"
 
     pp coqMod <> "\n"
       & writeFile (fileName ".txt")
 
-    pp (ToCoq coqMod) <> "\n"
+    pp (ToCoq optTarget coqMod) <> "\n"
       & writeFile (fileName ".v")

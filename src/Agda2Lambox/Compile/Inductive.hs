@@ -28,10 +28,9 @@ import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
 import LambdaBox qualified as LBox
 
-
 -- | Toplevel conversion from a datatype/record definition to a Lambdabox declaration.
-compileInductive :: Definition -> CompileM (Maybe (LBox.GlobalDecl Untyped))
-compileInductive defn@Defn{defName} = do
+compileInductive :: Target t -> Definition -> CompileM (Maybe (LBox.GlobalDecl t))
+compileInductive t defn@Defn{defName} = do
   mutuals <- liftTCM $ dataOrRecDefMutuals defn
 
   {- NOTE(flupe):
@@ -62,7 +61,7 @@ compileInductive defn@Defn{defName} = do
     unless (all (isDataOrRecDef . theDef) defs) $
       fail "mutually-defined datatypes/records *and* functions not supported."
 
-    bodies <- liftTCM $ forM defs actuallyConvertInductive
+    bodies <- liftTCM $ forM defs $ actuallyConvertInductive t
 
     return $ Just $ LBox.InductiveDecl $ LBox.MutualInductive
       { indFinite = LBox.Finite -- TODO(flupe)
@@ -70,17 +69,17 @@ compileInductive defn@Defn{defName} = do
       , indBodies = NEL.toList bodies
       }
 
-actuallyConvertInductive :: Definition -> TCM (LBox.OneInductiveBody Untyped)
-actuallyConvertInductive Defn{defName, theDef, defMutual} = case theDef of
+actuallyConvertInductive :: Target t -> Definition -> TCM (LBox.OneInductiveBody t)
+actuallyConvertInductive (t :: Target t) Defn{defName, theDef, defMutual} = case theDef of
   Datatype{..} -> do
 
-    ctors :: [LBox.ConstructorBody Untyped]
+    ctors :: [LBox.ConstructorBody t]
       <- forM dataCons \cname -> do
            DataCon arity <- getConstructorInfo cname
            return LBox.Constructor
              { cstrName  = prettyShow $ qnameName cname
              , cstrArgs  = arity
-             , cstrTypes = None
+             , cstrTypes = catchall t $ []
              }
 
     pure LBox.OneInductive
@@ -89,23 +88,27 @@ actuallyConvertInductive Defn{defName, theDef, defMutual} = case theDef of
       , indKElim         = LBox.IntoAny -- TODO(flupe)
       , indCtors         = ctors
       , indProjs         = []
-      , indTypeVars      = None
+      , indTypeVars      = catchall t $ []
       }
 
   Record{..} -> do
 
     let ConHead{conName, conFields} = recConHead
-        fields :: [LBox.ProjectionBody Untyped] =
-          flip LBox.Projection None . prettyShow . qnameName . unDom <$> recFields
+        fields :: [LBox.ProjectionBody t] =
+          flip LBox.Projection (catchall t LBox.TBox) . prettyShow . qnameName . unDom <$> recFields
 
     pure LBox.OneInductive
       { indName          = prettyShow $ qnameName defName
       , indPropositional = False        -- TODO(flupe)
       , indKElim         = LBox.IntoAny -- TODO(flupe)
-      , indCtors         = 
-          [ LBox.Constructor (prettyShow $ qnameName conName) (length conFields) None ]
+      , indCtors         =
+          [ LBox.Constructor
+              (prettyShow $ qnameName conName)
+              (length conFields)
+              $ catchall t []
+          ]
       , indProjs         = fields
-      , indTypeVars      = None
+      , indTypeVars      = catchall t []
       }
 
   -- { indFinite = maybe LBox.BiFinite inductionToRecKind recInduction

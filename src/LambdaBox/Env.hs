@@ -47,7 +47,7 @@ data OneInductiveBody t = OneInductive
   { indName          :: Ident
   , indPropositional :: Bool
   , indKElim         :: AllowedElims
-  , indTypeVars      :: WhenTyped TypeVarInfo t
+  , indTypeVars      :: WhenTyped [TypeVarInfo] t
   , indCtors         :: [ConstructorBody t]
   , indProjs         :: [ProjectionBody t]
   }
@@ -72,11 +72,11 @@ data GlobalDecl :: Typing -> Type where
   TypeAliasDecl :: Maybe ([TypeVarInfo], LBox.Type) -> GlobalDecl Typed
 
 -- | Global environment.
-type GlobalEnv t = [(KerName, GlobalDecl t)]
+newtype GlobalEnv t = GlobalEnv [(KerName, GlobalDecl t)]
 
 -- | Generated module
 data CoqModule t = CoqModule
-  { coqEnv      :: [(KerName, GlobalDecl t)]
+  { coqEnv      :: GlobalEnv t
   , coqPrograms :: [KerName]
   }
 
@@ -102,7 +102,10 @@ instance Pretty (GlobalDecl t) where
       hang "mutual inductive(s):" 2 $ 
         vsep $ map pretty indBodies
 
-instance Pretty (CoqModule t) where
-  pretty CoqModule{..} =
-    vsep $ flip map (reverse coqEnv) \(kn, d) ->
+instance Pretty (GlobalEnv t) where
+  pretty (GlobalEnv env) =
+    vsep $ flip map (reverse env) \(kn, d) ->
       hang (pretty kn <> ":") 2 (pretty d)
+
+instance Pretty (CoqModule t) where
+  pretty CoqModule{..} = pretty coqEnv

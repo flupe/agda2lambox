@@ -1,6 +1,6 @@
 {-# LANGUAGE NamedFieldPuns, DataKinds #-}
 module Agda2Lambox.Compile 
-  ( compileDefinition
+  ( compile
   ) where
 
 import Control.Monad.IO.Class ( liftIO )
@@ -21,14 +21,17 @@ import Agda2Lambox.Compile.Function  ( compileFunction  )
 import Agda2Lambox.Compile.Inductive ( compileInductive )
 
 import LambdaBox.Names
-import LambdaBox.Env ( GlobalDecl )
+import LambdaBox.Env (GlobalEnv(..), GlobalDecl)
 
+-- | Compile the given names to a λ□ environment.
+compile :: Target t -> [QName] -> TCM (GlobalEnv t)
+compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
 
-compileDefinition :: Definition -> CompileM (Maybe (KerName, GlobalDecl Untyped))
-compileDefinition defn@Defn{..} = do
+compileDefinition :: Target t -> Definition -> CompileM (Maybe (KerName, GlobalDecl t))
+compileDefinition t defn@Defn{..} = do
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
       Constructor{conData} -> Nothing <$ requireDef conData
-      Function{}           -> compileFunction defn
-      d | isDataOrRecDef d -> compileInductive defn
+      Function{}           -> compileFunction t defn
+      d | isDataOrRecDef d -> compileInductive t defn
       _                    -> Nothing <$ (liftIO $ putStrLn $ "Skipping " <> prettyShow defName)
