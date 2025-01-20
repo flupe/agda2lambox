@@ -19,7 +19,7 @@ import Agda.Syntax.Common ( hasQuantityω )
 import Agda.Utils.Monad (guardWithError, whenM)
 import Agda.Utils.Lens ( (^.) )
 
-import Agda.Utils ( etaExpandCtor )
+import Agda.Utils ( etaExpandCtor, treeless, pp )
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
 import Agda2Lambox.Compile.Term ( compileTerm )
@@ -35,7 +35,7 @@ isFunction _ = False
 -- | Convert a function body to a Lambdabox term.
 compileFunctionBody :: [QName] -> Definition -> CompileM LBox.Term
 compileFunctionBody ms Defn{defName, theDef} = do
-  Just t <- liftTCM $ toTreeless EagerEvaluation defName
+  Just t <- liftTCM $ treeless defName
   compileTerm ms =<< liftTCM (etaExpandCtor t)
 
 

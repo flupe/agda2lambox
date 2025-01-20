@@ -8,18 +8,21 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader.Class ( MonadReader, ask )
 import Control.Monad.Reader ( ReaderT(runReaderT), local )
 import Control.Monad.Trans
-import Data.List ( elemIndex, foldl' )
+import Data.List ( elemIndex, foldl', singleton )
 import Data.Maybe ( fromMaybe, listToMaybe )
+import Data.Foldable ( foldrM )
 
 import Agda.Compiler.Backend ( MonadTCState, HasOptions )
 import Agda.Compiler.Backend ( getConstInfo, theDef, pattern Datatype, dataMutual )
 import Agda.Syntax.Abstract.Name ( ModuleName(..), QName(..) )
+import Agda.Syntax.Builtin ( builtinZero, builtinSuc )
 import Agda.Syntax.Common ( Erased(..) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Literal
 import Agda.Syntax.Treeless ( TTerm(..), TAlt(..), CaseInfo(..), CaseType(..) )
 import Agda.TypeChecking.Datatypes ( getConstructorData, getConstructors )
 import Agda.TypeChecking.Monad.Base ( TCM , liftTCM, MonadTCEnv, MonadTCM )
+import Agda.TypeChecking.Monad.Builtin ( getBuiltinName_ )
 
 import LambdaBox ( Term(..) )
 import LambdaBox qualified as LBox
@@ -125,7 +128,15 @@ compileTermC = \case
 
 compileLit :: Literal -> C LBox.Term
 compileLit = \case
-  l        -> fail $ "unsupported literal: " <> prettyShow l
+
+  LitNat i -> do
+    qz <- liftTCM $ getBuiltinName_ builtinZero
+    qs <- liftTCM $ getBuiltinName_ builtinSuc
+    z  <- liftTCM $ toConApp qz []
+    let ss = take (fromInteger i) $ repeat (toConApp qs . singleton)
+    liftTCM $ foldrM ($) z ss
+
+  l -> fail $ "unsupported literal: " <> prettyShow l
 
 compileCaseType :: CaseType -> C LBox.Inductive
 compileCaseType = \case

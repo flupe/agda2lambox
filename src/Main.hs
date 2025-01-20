@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass, NamedFieldPuns #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, NamedFieldPuns, OverloadedStrings #-}
 -- | The agda2lambox Agda backend
 module Main (main) where
 
@@ -9,6 +9,7 @@ import Data.Function ( (&) )
 import Data.IORef ( IORef, newIORef, readIORef, modifyIORef' )
 import Data.Maybe ( fromMaybe, catMaybes )
 import Data.Version ( showVersion )
+import Data.Text ( pack )
 import GHC.Generics ( Generic )
 import System.Console.GetOpt ( OptDescr(Option), ArgDescr(ReqArg) )
 import System.Directory ( createDirectoryIfMissing )
@@ -57,7 +58,9 @@ agda2lambox = Backend backend
     backend :: Backend' Options Options ModuleEnv ModuleRes QName
     backend = Backend'
       { backendName           = "agda2lambox"
-      , backendVersion        = Just $ showVersion version
+      , backendInteractTop    = Nothing
+      , backendInteractHole   = Nothing
+      , backendVersion        = Just $ pack $ showVersion version
       , options               = defaultOptions
       , commandLineFlags      =
           [ Option ['o'] ["out-dir"] (ReqArg outdirOpt "DIR")

@@ -1,4 +1,4 @@
-packages: .
+packages: agda2lambox.cabal
 
 source-repository-package
   type: git
