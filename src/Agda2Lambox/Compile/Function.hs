@@ -64,9 +64,6 @@ compileFunction defn@Defn{theDef} = do
   let mdefs  = filter shouldCompileFunction defs
   let mnames = map defName mdefs
 
-  -- make sure that all mutuals get compiled
-  mapM requireDef mnames
-
   -- if the function is not recursive, just compile the body
   if null mdefs then Just. LBox.ConstantDecl . Just <$> compileFunctionBody [] defn
 
