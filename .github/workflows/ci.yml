@@ -1,0 +1,45 @@
+name: "CI"
+
+on:
+  pull_request:
+  push:
+    paths:
+      - 'src/**'
+      - 'agda2lambox.cabal'
+      - 'cabal.project'
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }} / ghc ${{ matrix.ghc }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        cabal: [3.12.1]
+        ghc: [9.10.1]
+
+    steps:
+    - uses: actions/checkout@v3
+      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
+
+    - name: Install Haskell
+      uses: haskell-actions/setup@v2
+      id: setup-haskell-cabal
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: ${{ matrix.cabal }}
+
+    - name: Freeze cabal dependencies
+      run: cabal freeze
+
+    - name: Cache cabal store
+      uses: actions/cache@v3
+      with:
+        path:         ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
+        key:          ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('cabal.project.freeze') }}
+        restore-keys: ${{ runner.os }}-${{ matrix.ghc }}-
+
+    - name: Build
+      run: cabal build
