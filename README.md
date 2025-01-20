@@ -18,28 +18,17 @@ make -f CoqMakefile
 cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 ```
 
+## Implemented
+
+- Compilation to untyped λ□ programs:
+  - Mutually-defined datatypes and record types.
+  - Mutually-defined functions.
+  - Importing modules.
+    The backend transitively compiles all required definitions, and only those.
+  - Nat literals.
+
 ## TODO
 
-- [x] Fix generation of Coq code
-- [x] Add Coq pretty-printing
-- [x] Support mutual definitions
-- [x] Support one-inductive
-- [x] Add pragma for program selection
-- [x] Make pretty-printer prettier
-- [x] Ensure well-formedness of generated programs inside Coq
-  - [x] Make well-formedness check faster by splitting it into boolean and propositional
-- [x] Evaluate λ□ programs from inside Coq to start testing
-  - [x] Using the λ□-Mut from CertiCoq
-- [x] Support mutual inductives
-- [x] Refactor backend
-  - Get rid of the Convert class.
-  - Possibly put everything in a single module
-  - Unify compilation of records and datatypes
-- [x] Support (one-inductive) records
-  - [x] Properly translate projections in terms (by actually generating projections)
-- [x] Support mutual (possibly inductive) records
-- [x] Traverse multiple files to get all (required) definitions
-- [ ] Support (nat) literals
 - [ ] Better error-reporting
 - [ ] Check support for Agda-specific edge cases
   - [x] Pattern-matching lambdas
@@ -47,9 +36,15 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
   - [ ] Module applications
   - [ ] Projection-like
 - [ ] Support primitives (ints and floats)
+
 - [ ] Setup compilation to Wasm/Rust using Certicoq
-  - [ ] May require generating λ□ terms for an older MetaCoq
 - [ ] Setup proper testing infrastructure
+
+## Icebox
+
+Things that ought to be implemented, but not right now.
+
+- [ ] Caching of compiled modules.
 
 ## References
 
