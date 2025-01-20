@@ -15,6 +15,14 @@ import Agda.TypeChecking.Substitute ( raise )
 import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Treeless
 
+import Agda.Compiler.ToTreeless          qualified as TT
+import Agda.Compiler.Treeless.Builtin    qualified as TT
+import Agda.Compiler.Treeless.Erase      qualified as TT
+import Agda.Compiler.Treeless.Simplify   qualified as TT
+import Agda.Compiler.Treeless.Identity   qualified as TT
+import Agda.Compiler.Treeless.Uncase     qualified as TT
+import Agda.Compiler.Treeless.AsPatterns qualified as TT
+
 
 -- * Miscellaneous
 
@@ -38,6 +46,26 @@ isFunDef = \case
   _ -> False
 
 isDataOrRecDef = liftA2 (||) isDataDef isRecDef
+
+-- ** toTreeless custom pipeline
+
+-- | Convert compiled clauses to treeless syntax, and return it.
+treeless :: QName -> TCM (Maybe TTerm)
+treeless = TT.toTreelessWith compilerPipeline (EagerEvaluation, TT.EraseUnused)
+  where
+  compilerPipeline v q =
+    TT.Sequential
+      -- NOTE (flupe): this is the default Agda treeless pipeline
+      --               with the builtin pass removed.
+      -- [ TT.compilerPass "builtin" (30 + v) "builtin translation" $ const TT.translateBuiltins
+      [ TT.FixedPoint 5 $ TT.Sequential
+        [ TT.compilerPass "simpl"  (30 + v) "simplification"     $ const TT.simplifyTTerm
+        , TT.compilerPass "erase"  (30 + v) "erasure"            $ TT.eraseTerms q
+        , TT.compilerPass "uncase" (30 + v) "uncase"             $ const TT.caseToSeq
+        , TT.compilerPass "aspat"  (30 + v) "@-pattern recovery" $ const TT.recoverAsPatterns
+        ]
+      , TT.compilerPass "id" (30 + v) "identity function detection" $ const (TT.detectIdentityFunctions q)
+      ]
 
 -- ** eta-expansion of constructors
 
