@@ -21,17 +21,21 @@ import Agda2Lambox.Compile.Function  ( compileFunction  )
 import Agda2Lambox.Compile.Inductive ( compileInductive )
 
 import LambdaBox.Names
-import LambdaBox.Env (GlobalEnv(..), GlobalDecl)
+import LambdaBox.Env (GlobalEnv(..), GlobalDecl(..), ConstantBody(..))
+import Agda2Lambox.Compile.Type (compileType)
 
 -- | Compile the given names to a λ□ environment.
 compile :: Target t -> [QName] -> TCM (GlobalEnv t)
 compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
 
 compileDefinition :: Target t -> Definition -> CompileM (Maybe (KerName, GlobalDecl t))
-compileDefinition t defn@Defn{..} = do
+compileDefinition target defn@Defn{..} = do
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
+      Axiom{} -> do
+        typ <- whenTyped target $ liftTCM $ compileType defType
+        pure $ Just $ ConstantDecl $ ConstantBody (([], ) <$> typ) Nothing
       Constructor{conData} -> Nothing <$ requireDef conData
-      Function{}           -> compileFunction t defn
-      d | isDataOrRecDef d -> compileInductive t defn
-      _                    -> Nothing <$ (liftIO $ putStrLn $ "Skipping " <> prettyShow defName)
+      Function{}           -> compileFunction target defn
+      d | isDataOrRecDef d -> compileInductive target defn
+      _                    -> fail $ "Cannot compile: " <> prettyShow defName

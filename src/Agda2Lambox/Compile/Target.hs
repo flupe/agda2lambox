@@ -25,7 +25,8 @@ data WhenTyped :: Typing -> Type -> Type where
   None ::      WhenTyped Untyped a
   Some :: a -> WhenTyped Typed   a
 
-instance Functor (WhenTyped Typed) where
+instance Functor (WhenTyped t) where
+  fmap f None     = None
   fmap f (Some x) = Some (f x)
 
 instance Applicative (WhenTyped Typed) where
