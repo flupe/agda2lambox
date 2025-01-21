@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, FlexibleContexts, OverloadedStrings, DataKinds, MonadComprehensions #-}
 -- | Generating Coq code from our LambdaBox AST
-module CoqGen where
+module CoqGen (prettyCoq) where
 
 import Data.Bifunctor(bimap)
 import Data.List(intercalate)
@@ -11,8 +11,24 @@ import Agda.Utils.Function (applyWhen)
 import Agda2Lambox.Compile.Target
 
 
--- | Wrapper for pretty-printing to Coq
-data ToCoq t a = ToCoq (Target t) a
+class ToCoq t a where
+  pcoq  :: Target t -> a -> Doc
+  pcoqP :: Int -> Target t -> a -> Doc
+  pcoq  = pcoqP 0
+  pcoqP = const pcoq
+  {-# MINIMAL pcoq | pcoqP #-}
+
+-- | Shorthand for untyped λ□ pretty-printer.
+upcoq :: ToCoq Untyped a => a -> Doc
+upcoq = pcoq ToUntyped
+
+-- | Shorthand for typed λ□ pretty-printer.
+tpcoq :: ToCoq Typed a => a -> Doc
+tpcoq = pcoq ToTyped
+
+-- | Pretty-print a Coq-printable term.
+prettyCoq :: ToCoq t a => Target t -> a -> String
+prettyCoq t = render . pcoq t
 
 -- | Util to format Coq constructor with the given arguments.
 ctor :: String -> [Doc] -> Doc
@@ -32,129 +48,102 @@ record = enclose
        . map \(k, v) -> hang (text k <+> ":=") 2 v
   where enclose x = "{|" <+> x <+> "|}"
 
--- | Shorthand to generate Coq from a value.
-pcoq :: Pretty (ToCoq t a) => Target t -> a -> Doc
-pcoq t = pcoqP t 0
-{-# INLINE pcoq #-}
+instance ToCoq t Doc  where pcoq _ d = d
+instance ToCoq t Int  where pcoq _ s = pretty s
+instance ToCoq t Bool where pcoq _ v = if v then "true" else "false"
 
--- | Shorthand to generate Coq from a value, given precedence.
-pcoqP :: Pretty (ToCoq t a) => Target t -> Int -> a -> Doc
-pcoqP t p = prettyPrec p . ToCoq t
-{-# INLINE pcoqP #-}
-
-
-instance Pretty (ToCoq t Doc) where
-  pretty (ToCoq _ d) = d
-
-instance {-# OVERLAPPING #-} Pretty (ToCoq t String) where
-  pretty (ToCoq _ s) = text (show s) <> "%bs"
+instance {-# OVERLAPPING #-} ToCoq t String where
+  pcoq _ s = text (show s) <> "%bs"
   -- NOTE(flupe): "%bs" to make sure that we produce Coq bytestrings
 
-instance Pretty (ToCoq t Int) where
-  pretty (ToCoq _ s) = pretty s
+instance ToCoq t a => ToCoq t (Maybe a) where
+  pcoqP p t x = case x of
+    Nothing -> ctorP p "None" []
+    Just y  -> ctorP p "Some" [pcoqP 10 t y]
 
-instance Pretty (ToCoq t Bool) where
-  pretty (ToCoq t v) = if v then "true" else "false"
+instance ToCoq t a => ToCoq t [a] where
+  pcoq t xs = brackets $ fsep $ punctuate ";" $ map (pcoq t) xs
 
-instance Pretty (ToCoq t a) => Pretty (ToCoq t (Maybe a)) where
-  prettyPrec p (ToCoq t x) =
-    case x of
-      Nothing -> ctorP p "None" []
-      Just y  -> ctorP p "Some" [pcoqP t 10 y]
+instance (ToCoq t a, ToCoq t b) => ToCoq t (a, b) where
+  pcoq t (a, b) = parens $ fsep [pcoq t a <> comma, pcoq t b]
 
-instance Pretty (ToCoq t a) => Pretty (ToCoq t [a]) where
-  pretty (ToCoq t xs) =
-    brackets $ fsep (punctuate ";" $ map (pcoq t) xs)
+instance ToCoq t Name where
+  pcoq t n = case n of
+    Anon    -> ctor "nAnon"  []
+    Named i -> ctor "nNamed" [pcoq t i]
 
-instance (Pretty (ToCoq t a), Pretty (ToCoq t b)) => Pretty (ToCoq t (a, b)) where
-  pretty (ToCoq t (a, b)) = parens $ fsep [pcoq t a <> comma, pcoq t b]
+instance ToCoq t ModPath where
+  pcoqP p t mp = case mp of
+    MPFile dp       -> ctorP p "MPfile"  [pcoqP 10 t dp]
+    MPBound dp id i -> ctorP p "MPbound" [pcoqP 10 t dp, pcoqP 10 t id, pcoqP 10 t i]
+    MPDot mp id     -> ctorP p "MPdot"   [pcoqP 10 t mp, pcoqP 10 t id]
 
-instance Pretty (ToCoq t Name) where
-  pretty (ToCoq t n) =
-    case n of
-      Anon    -> ctor "nAnon"  []
-      Named i -> ctor "nNamed" [pcoq t i]
+instance ToCoq t KerName where
+  pcoq t KerName{..} = pcoq t (kerModPath, kerName)
 
-instance Pretty (ToCoq t Inductive) where
-  pretty (ToCoq t Inductive{..}) =
+instance ToCoq t Inductive where
+  pcoq t Inductive{..} =
     record [ ("inductive_mind", pcoq t indMInd)
            , ("inductive_ind",  pcoq t indInd)
            ]
 
-instance Pretty (ToCoq t ModPath) where
-  prettyPrec p (ToCoq t mp) =
-    case mp of
-      MPFile dp       -> ctorP p "MPfile"  [pcoqP t 10 dp]
-      MPBound dp id i -> ctorP p "MPbound" [pcoqP t 10 dp, pcoqP t 10 id, pcoqP t 10 i]
-      MPDot mp id     -> ctorP p "MPdot"   [pcoqP t 10 mp, pcoqP t 10 id]
-
-instance Pretty (ToCoq t KerName) where
-  pretty (ToCoq t KerName{..}) = pcoq t (kerModPath, kerName)
-
-instance Pretty (ToCoq t d) => Pretty (ToCoq t (Def d)) where
-  pretty (ToCoq t Def{..}) =
+instance ToCoq t d => ToCoq t (Def d) where
+  pcoq t Def{..} =
     record [ ("dname", pcoq t dName)
            , ("dbody", pcoq t dBody)
            , ("rarg",  pcoq t dArgs)
            ]
 
-instance Pretty (ToCoq t Term) where
-  prettyPrec p (ToCoq t v) =
-    case v of
-      LBox                -> ctorP p "tBox"       []
-      LRel k              -> ctorP p "tRel"       [pretty k]
-      LLambda n u         -> ctorP p "tLambda"    [pcoq t n, pcoqP t 10 u]
-      LLetIn n u v        -> ctorP p "tLetIn"     [pcoq t n, pcoqP t 10 u, pcoqP t 10 v]
-      LApp u v            -> ctorP p "tApp"       [pcoqP t 10 u, pcoqP t 10 v]
-      LConst c            -> ctorP p "tConst"     [pcoqP t 10 c]
-      LConstruct ind i es -> ctorP p "tConstruct" [pcoqP t 10 ind, pcoqP t 10 i, pcoqP t 10 es]
-      LCase ind n u bs    -> ctorP p "tCase"      [pcoqP t 10 (ind, n), pcoqP t 10 u, pcoqP t 10 bs]
-      LFix mf i           -> ctorP p "tFix"       [pcoqP t 10 mf, pcoqP t 10 i]
+instance ToCoq t Term where
+  pcoqP p t v = case v of
+    LBox                -> ctorP p "tBox"       []
+    LRel k              -> ctorP p "tRel"       [pretty k]
+    LLambda n u         -> ctorP p "tLambda"    [pcoq t n, pcoqP 10 t u]
+    LLetIn n u v        -> ctorP p "tLetIn"     [pcoq t n, pcoqP 10 t u, pcoqP 10 t v]
+    LApp u v            -> ctorP p "tApp"       [pcoqP 10 t u, pcoqP 10 t v]
+    LConst c            -> ctorP p "tConst"     [pcoqP 10 t c]
+    LConstruct ind i es -> ctorP p "tConstruct" [pcoqP 10 t ind, pcoqP 10 t i, pcoqP 10 t es]
+    LCase ind n u bs    -> ctorP p "tCase"      [pcoqP 10 t (ind, n), pcoqP 10 t u, pcoqP 10 t bs]
+    LFix mf i           -> ctorP p "tFix"       [pcoqP 10 t mf, pcoqP 10 t i]
 
-instance Pretty (ToCoq t Type) where
-  prettyPrec p (ToCoq t v) =
-    case v of
-      TBox      -> ctorP p "TBox"   []
-      TAny      -> ctorP p "TAny"   []
-      TArr a b  -> ctorP p "TArr"   [pcoqP t 10 a, pcoqP t 10 b]
-      TApp a b  -> ctorP p "TApp"   [pcoqP t 10 a, pcoqP t 10 b]
-      TVar k    -> ctorP p "TVar"   [pretty k]
-      TInd ind  -> ctorP p "TInd"   [pcoqP t 10 ind]
-      TConst kn -> ctorP p "TConst" [pcoqP t 10 kn]
+instance ToCoq t Type where
+  pcoqP p t v = case v of
+    TBox      -> ctorP p "TBox"   []
+    TAny      -> ctorP p "TAny"   []
+    TArr a b  -> ctorP p "TArr"   [pcoqP 10 t a, pcoqP 10 t b]
+    TApp a b  -> ctorP p "TApp"   [pcoqP 10 t a, pcoqP 10 t b]
+    TVar k    -> ctorP p "TVar"   [pretty k]
+    TInd ind  -> ctorP p "TInd"   [pcoqP 10 t ind]
+    TConst kn -> ctorP p "TConst" [pcoqP 10 t kn]
 
-instance Pretty (ToCoq t RecursivityKind) where
-  pretty (ToCoq _ rk) =
-    case rk of
-      Finite   -> ctor "Finite"   []
-      CoFinite -> ctor "CoFinite" []
-      BiFinite -> ctor "BiFinite" []
+instance ToCoq t RecursivityKind where
+  pcoq _ rk = case rk of
+    Finite   -> ctor "Finite"   []
+    CoFinite -> ctor "CoFinite" []
+    BiFinite -> ctor "BiFinite" []
 
-instance Pretty (ToCoq t AllowedElims) where
-  pretty (ToCoq t ae) =
-    case ae of
-      IntoSProp        -> ctor "IntoSProp"        []
-      IntoPropSProp    -> ctor "IntoPropSProp"    []
-      IntoSetPropSProp -> ctor "IntoSetPropSProp" []
-      IntoAny          -> ctor "IntoAny"          []
+instance ToCoq t AllowedElims where
+  pcoq t ae = case ae of
+    IntoSProp        -> ctor "IntoSProp"        []
+    IntoPropSProp    -> ctor "IntoPropSProp"    []
+    IntoSetPropSProp -> ctor "IntoSetPropSProp" []
+    IntoAny          -> ctor "IntoAny"          []
 
-instance Pretty (ToCoq t (ConstructorBody t)) where
-  pretty (ToCoq t Constructor{..}) =
-    case t of
-      ToUntyped ->
-        record [ ("cstr_name",  pcoq t cstrName)
-               , ("cstr_nargs", pcoq t cstrArgs)
-               ]
-      ToTyped   ->
-        pcoq t ((cstrName, getTyped cstrTypes), cstrArgs)
+instance ToCoq t (ConstructorBody t) where
+  pcoq ToUntyped Constructor{..} =
+    record [ ("cstr_name",  upcoq cstrName)
+           , ("cstr_nargs", upcoq cstrArgs)
+           ]
 
-instance Pretty (ToCoq t (ProjectionBody t)) where
-  pretty (ToCoq t Projection{..}) =
-    case t of
-      ToUntyped -> record [("proj_name",  pcoq t projName)]
-      ToTyped   -> pcoq t (projName, getTyped projType)
+  pcoq ToTyped Constructor{..} =
+    tpcoq ((cstrName, getTyped cstrTypes), cstrArgs)
 
-instance Pretty (ToCoq t TypeVarInfo) where
-  pretty (ToCoq t TypeVarInfo{..}) =
+instance ToCoq t (ProjectionBody t) where
+  pcoq ToUntyped Projection{..} = record [("proj_name",  upcoq projName)]
+  pcoq ToTyped   Projection{..} = tpcoq (projName, getTyped projType)
+
+instance ToCoq t TypeVarInfo where
+  pcoq t TypeVarInfo{..} =
     record
       [ ("tvar_name",       pcoq t tvarName)
       , ("tvar_is_logical", pcoq t tvarIsLogical)
@@ -162,8 +151,8 @@ instance Pretty (ToCoq t TypeVarInfo) where
       , ("tvar_is_sort",    pcoq t tvarIsSort)
       ]
 
-instance Pretty (ToCoq t (OneInductiveBody t)) where
-  pretty (ToCoq t OneInductive{..}) =
+instance ToCoq t (OneInductiveBody t) where
+  pcoq t OneInductive{..} =
     record $
       [ ("ind_name",          pcoq t indName)
       , ("ind_propositional", pcoq t indPropositional)
@@ -175,39 +164,33 @@ instance Pretty (ToCoq t (OneInductiveBody t)) where
         ToUntyped -> []
         ToTyped   -> [("ind_type_vars", pcoq t $ getTyped indTypeVars)]
 
-instance Pretty (ToCoq t (MutualInductiveBody t)) where
-  pretty (ToCoq t MutualInductive{..}) =
+instance ToCoq t (MutualInductiveBody t) where
+  pcoq t MutualInductive{..} =
     record [ ("ind_finite", pcoq t indFinite)
            , ("ind_npars",  pcoq t indPars)
            , ("ind_bodies", pcoq t indBodies)
            ]
 
-instance Pretty (ToCoq t (ConstantBody t)) where
-  prettyPrec p (ToCoq t ConstantBody{..}) =
+instance ToCoq t (ConstantBody t) where
+  pcoqP p t ConstantBody{..} =
     record $
       [("cst_body", pcoq t cstBody)] ++
       case t of
         ToUntyped -> []
         ToTyped   -> [("cst_type", pcoq t $ getTyped cstType)]
 
-instance Pretty (ToCoq t (GlobalDecl t)) where
-  prettyPrec p (ToCoq t decl) =
-    case decl of
-      ConstantDecl  body  ->
-        ctorP p "ConstantDecl"  [pcoqP t 10 body]
-      InductiveDecl minds ->
-        ctorP p "InductiveDecl" [pcoqP t 10 minds]
-      TypeAliasDecl typ ->
-        ctorP p "TypeAliasDecl" [pcoqP t 10 typ]
+instance ToCoq t (GlobalDecl t) where
+  pcoqP p t decl = case decl of
+    ConstantDecl  body  -> ctorP p "ConstantDecl"  [pcoqP 10 t body]
+    InductiveDecl minds -> ctorP p "InductiveDecl" [pcoqP 10 t minds]
+    TypeAliasDecl typ   -> ctorP p "TypeAliasDecl" [pcoqP 10 t typ]
 
-instance Pretty (ToCoq t (GlobalEnv t)) where
-  pretty (ToCoq t (GlobalEnv env)) =
-    case t of
-      ToUntyped -> pcoq t env
-      ToTyped   -> pcoq t $ flip map env \(kn, decl) -> ((kn, True), decl)
+instance ToCoq t (GlobalEnv t) where
+  pcoq ToUntyped (GlobalEnv env) = upcoq env
+  pcoq ToTyped   (GlobalEnv env) = tpcoq $ flip map env \(kn, decl) -> ((kn, True), decl)
 
-instance Pretty (ToCoq t (CoqModule t)) where
-  pretty (ToCoq t@ToUntyped CoqModule{..}) = vsep
+instance ToCoq t (CoqModule t) where
+  pcoq ToUntyped CoqModule{..} = vsep
     [ vcat
         [ "From Coq             Require Import List."
         , "From MetaCoq.Common  Require Import BasicAst Kernames Universes."
@@ -218,20 +201,20 @@ instance Pretty (ToCoq t (CoqModule t)) where
         ]
 
     , hang "Definition env : global_declarations :=" 2 $
-        pcoq t coqEnv <> "."
+        upcoq coqEnv <> "."
 
     , "Compute @check_wf_glob eflags env."
 
     , vsep $ flip map (zip [1..] $ reverse coqPrograms) \(i :: Int, kn) -> 
         let progname = "prog" <> pretty i in vsep
         [ hang ("Definition " <> progname <> " : program :=") 2 $
-            pcoq t (text "env" :: Doc, LConst kn) 
+            upcoq (text "env" :: Doc, LConst kn) 
             <> "."
         , "Compute eval_program " <> progname <> "."
         ]
     ]
 
-  pretty (ToCoq t@ToTyped CoqModule{..}) = vsep
+  pcoq ToTyped CoqModule{..} = vsep
     [ vcat
         [ "From Coq             Require Import List."
         , "From MetaCoq.Common  Require Import BasicAst Kernames Universes."
@@ -241,5 +224,5 @@ instance Pretty (ToCoq t (CoqModule t)) where
         , "Import ListNotations."
         ]
 
-    , hang "Definition env : global_env :=" 2 $ pcoq t coqEnv <> "."
+    , hang "Definition env : global_env :=" 2 $ tpcoq coqEnv <> "."
     ]

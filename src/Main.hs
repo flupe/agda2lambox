@@ -30,7 +30,7 @@ import Agda.Utils ( pp, hasPragma, isDataOrRecDef )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile       (compile)
-import CoqGen    ( ToCoq(ToCoq) )
+import CoqGen    ( prettyCoq )
 import LambdaBox.Env
 
 
@@ -120,5 +120,5 @@ writeModule Options{..} menv IsMain m defs = do
     pp coqMod <> "\n"
       & writeFile (fileName ".txt")
 
-    pp (ToCoq optTarget coqMod) <> "\n"
+    prettyCoq optTarget coqMod <> "\n"
       & writeFile (fileName ".v")
