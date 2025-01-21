@@ -145,13 +145,13 @@ instance Pretty (ToCoq t (ConstructorBody t)) where
                , ("cstr_nargs", pcoq t cstrArgs)
                ]
       ToTyped   ->
-        pcoq t ((cstrName, extract cstrTypes), cstrArgs)
+        pcoq t ((cstrName, getTyped cstrTypes), cstrArgs)
 
 instance Pretty (ToCoq t (ProjectionBody t)) where
   pretty (ToCoq t Projection{..}) =
     case t of
       ToUntyped -> record [("proj_name",  pcoq t projName)]
-      ToTyped   -> pcoq t (projName, extract projType)
+      ToTyped   -> pcoq t (projName, getTyped projType)
 
 instance Pretty (ToCoq t TypeVarInfo) where
   pretty (ToCoq t TypeVarInfo{..}) =
@@ -173,7 +173,7 @@ instance Pretty (ToCoq t (OneInductiveBody t)) where
       ] ++
       case t of
         ToUntyped -> []
-        ToTyped   -> [("ind_type_vars", pcoq t $ extract indTypeVars)]
+        ToTyped   -> [("ind_type_vars", pcoq t $ getTyped indTypeVars)]
 
 instance Pretty (ToCoq t (MutualInductiveBody t)) where
   pretty (ToCoq t MutualInductive{..}) =
@@ -188,7 +188,7 @@ instance Pretty (ToCoq t (ConstantBody t)) where
       [("cst_body", pcoq t cstBody)] ++
       case t of
         ToUntyped -> []
-        ToTyped   -> [("cst_type", pcoq t $ extract cstType)]
+        ToTyped   -> [("cst_type", pcoq t $ getTyped cstType)]
 
 instance Pretty (ToCoq t (GlobalDecl t)) where
   prettyPrec p (ToCoq t decl) =

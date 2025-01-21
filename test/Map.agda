@@ -1,23 +1,13 @@
-data Nat : Set where
-  zero : Nat
-  succ : Nat → Nat
-
-add : Nat -> Nat -> Nat
-add zero y = y
-add (succ x) y = succ (add x y)
-
-infixr 7 _::_
-data List (A : Set) : Set where
-  []   : List A
-  _::_ : A -> List A -> List A
+open import Agda.Builtin.Nat
+open import Agda.Builtin.List
 
 xs : List Nat
-xs = zero :: []
+xs = zero ∷ []
 
-map : {A B : Set} -> (A -> B) -> List A -> List B
+map : {A B : Set} -> (A → B) → List A → List B
 map f [] = []
-map f (x :: xs) = f x :: map f xs
+map f (x ∷ xs) = f x ∷ map f xs
 
 ys : List Nat
-ys = map succ xs
+ys = map (2 +_) xs
 {-# COMPILE AGDA2LAMBOX ys #-}

@@ -26,13 +26,13 @@ data RecursivityKind
 data ConstructorBody t = Constructor
   { cstrName  :: Ident
   , cstrArgs  :: Int
-  , cstrTypes :: WhenTyped [(Name, LBox.Type)] t
+  , cstrTypes :: WhenTyped t [(Name, LBox.Type)]
   }
 
 -- | Projection info in datatype declaration.
 data ProjectionBody t = Projection
   { projName :: Ident
-  , projType :: WhenTyped LBox.Type t
+  , projType :: WhenTyped t LBox.Type
   }
 
 data TypeVarInfo = TypeVarInfo
@@ -47,7 +47,7 @@ data OneInductiveBody t = OneInductive
   { indName          :: Ident
   , indPropositional :: Bool
   , indKElim         :: AllowedElims
-  , indTypeVars      :: WhenTyped [TypeVarInfo] t
+  , indTypeVars      :: WhenTyped t [TypeVarInfo]
   , indCtors         :: [ConstructorBody t]
   , indProjs         :: [ProjectionBody t]
   }
@@ -61,7 +61,7 @@ data MutualInductiveBody t = MutualInductive
 
 -- | Definition of a constant in the environment
 data ConstantBody t = ConstantBody
-  { cstType :: WhenTyped ([Name], LBox.Type) t
+  { cstType :: WhenTyped t ([Name], LBox.Type)
   , cstBody :: Maybe Term
   }
 

@@ -56,7 +56,7 @@ typedOpt opts = return opts { optTarget = ToTyped }
 defaultOptions :: Options
 defaultOptions = Options
   { optOutDir = Nothing
-  , optTarget = ToTyped
+  , optTarget = ToUntyped
   }
 
 -- | Backend module environments.

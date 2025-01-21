@@ -53,8 +53,8 @@ shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
 
 -- | Convert a function definition to a λ□ declaration.
 compileFunction :: Target t -> Definition -> CompileM (Maybe (LBox.GlobalDecl t))
-compileFunction t defn | not (shouldCompileFunction defn) = return Nothing
-compileFunction t defn@Defn{theDef, defType} = do
+compileFunction t defn | not (shouldCompileFunction defn) = pure Nothing
+compileFunction (t :: Target t) defn@Defn{theDef, defType} = do
   let Function{funMutual = Just mutuals} = theDef
 
   defs <- liftTCM $ mapM getConstInfo mutuals
@@ -67,18 +67,20 @@ compileFunction t defn@Defn{theDef, defType} = do
   let mdefs  = filter shouldCompileFunction defs
   let mnames = map defName mdefs
 
-  -- TODO(flupe): enforce that compilation only happend when t is Typed
-  typ <- liftTCM $ whenTyped t . ([],) <$> compileType defType
+  -- compile function type, if necessary
+  typ <- liftTCM $ whenTyped t $ ([],) <$> compileType defType
+
+  let builder :: LBox.Term -> Maybe (LBox.GlobalDecl t)
+      builder = Just . ConstantDecl . ConstantBody typ . Just
 
   -- if the function is not recursive, just compile the body
-  if null mdefs then
-    Just . ConstantDecl . ConstantBody typ . Just <$> compileFunctionBody [] defn
+  if null mdefs then builder <$> compileFunctionBody [] defn
 
   -- otherwise, take fixpoint
   else do
     let k = fromMaybe 0 $ elemIndex (defName defn) mnames
 
-    Just . ConstantDecl . ConstantBody typ . Just . flip LBox.LFix k <$>
+    builder . flip LBox.LFix k <$>
       forM mdefs \def@Defn{defName} -> do
         body <- compileFunctionBody mnames def
         return LBox.Def
