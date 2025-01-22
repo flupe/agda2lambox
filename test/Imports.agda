@@ -10,4 +10,5 @@ map f [] = []
 map f (x ∷ xs) = f x ∷ map f xs
 
 test2 : List Nat
-test2 = map suc (1 ∷ [])
+test2 = map (5 +_) (1 ∷ [])
+{-# COMPILE AGDA2LAMBOX test2 #-}

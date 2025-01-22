@@ -15,7 +15,7 @@ import Data.Foldable ( foldrM )
 import Agda.Compiler.Backend ( MonadTCState, HasOptions )
 import Agda.Compiler.Backend ( getConstInfo, theDef, pattern Datatype, dataMutual )
 import Agda.Syntax.Abstract.Name ( ModuleName(..), QName(..) )
-import Agda.Syntax.Builtin ( builtinZero, builtinSuc )
+import Agda.Syntax.Builtin ( builtinNat, builtinZero, builtinSuc )
 import Agda.Syntax.Common ( Erased(..) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Literal
@@ -131,10 +131,12 @@ compileLit :: Literal -> C LBox.Term
 compileLit = \case
 
   LitNat i -> do
+    qn <- liftTCM $ getBuiltinName_ builtinNat
     qz <- liftTCM $ getBuiltinName_ builtinZero
     qs <- liftTCM $ getBuiltinName_ builtinSuc
     z  <- liftTCM $ toConApp qz []
     let ss = take (fromInteger i) $ repeat (toConApp qs . singleton)
+    lift $ requireDef qn
     liftTCM $ foldrM ($) z ss
 
   l -> fail $ "unsupported literal: " <> prettyShow l

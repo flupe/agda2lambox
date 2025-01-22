@@ -17,6 +17,7 @@ import Queue.Ephemeral qualified as Queue
 import Agda.Compiler.Backend ( QName, Definition, getConstInfo )
 import Agda.TypeChecking.Monad.Base ( TCM, MonadTCEnv, MonadTCM(liftTCM), MonadTCState, MonadTCEnv, HasOptions )
 import Agda.Utils.List ( mcons )
+import Agda.Syntax.Common.Pretty (prettyShow)
 
 -- | Backend compilation state.
 data CompileState = CompileState
@@ -52,7 +53,8 @@ requireDef :: QName -> CompileM ()
 requireDef q = Compile $ do
   seen <- gets seenDefs
   -- a name is only added to the queue if we haven't seen it yet
-  unless (Set.member q seen) $
+  unless (Set.member q seen) do
+    liftIO $ putStrLn $ "Requiring definition: " <> prettyShow q
     modify \ s -> s
       { seenDefs     = Set.insert q seen
       , compileQueue = Queue.enqueue q $ compileQueue s

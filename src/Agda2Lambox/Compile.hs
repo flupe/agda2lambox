@@ -12,16 +12,19 @@ import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.TypeChecking.Monad ( liftTCM, getConstInfo )
 import Agda.Utils.Monad ( whenM )
 
-import Agda.Utils ( hasPragma, isDataOrRecDef )
+import Agda.Utils ( hasPragma, isDataOrRecDef, treeless )
 
 import Agda2Lambox.Compile.Monad
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
+import Agda2Lambox.Compile.Term      ( compileTerm )
 import Agda2Lambox.Compile.Function  ( compileFunction  )
 import Agda2Lambox.Compile.Inductive ( compileInductive )
 
 import LambdaBox.Names
 import LambdaBox.Env (GlobalEnv(..), GlobalDecl(..), ConstantBody(..))
+import LambdaBox.Type qualified as LamBox
+
 import Agda2Lambox.Compile.Type (compileType)
 
 -- | Compile the given names to a λ□ environment.
@@ -30,12 +33,25 @@ compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
 
 compileDefinition :: Target t -> Definition -> CompileM (Maybe (KerName, GlobalDecl t))
 compileDefinition target defn@Defn{..} = do
+  liftIO $ putStrLn $ "Compiling definition: " <> prettyShow defName
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
+
       Axiom{} -> do
-        typ <- whenTyped target $ liftTCM $ compileType defType
-        pure $ Just $ ConstantDecl $ ConstantBody (([], ) <$> typ) Nothing
+        typ <- whenTyped target $ liftTCM $ ([],) <$> compileType defType
+        pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
+
       Constructor{conData} -> Nothing <$ requireDef conData
-      Function{}           -> compileFunction target defn
+
+      Function{} -> compileFunction target defn
+
       d | isDataOrRecDef d -> compileInductive target defn
-      _                    -> fail $ "Cannot compile: " <> prettyShow defName
+
+      Primitive{..} -> do
+        liftIO $ putStrLn $ "Found primitive: " <> prettyShow defName
+        liftIO $ putStrLn $ "Compiling it as axiom."
+
+        typ <- liftTCM $ whenTyped target $ ([],) <$> compileType defType
+        pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
+
+      _ -> fail $ "Cannot compile: " <> prettyShow defName
