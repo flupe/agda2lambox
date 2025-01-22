@@ -33,7 +33,7 @@ compile :: Target t -> [QName] -> TCM (GlobalEnv t)
 compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
 
 compileDefinition :: Target t -> Definition -> CompileM (Maybe (KerName, GlobalDecl t))
-compileDefinition target defn@Defn{..} = do
+compileDefinition target defn@Defn{..} = setCurrentRange defName do
   reportSDoc "agda2lambox.compile" 1 $ "Compiling definition: " <+> prettyTCM defName
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
@@ -55,4 +55,4 @@ compileDefinition target defn@Defn{..} = do
         typ <- liftTCM $ whenTyped target $ ([],) <$> compileType defType
         pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
 
-      _ -> fail $ "Cannot compile: " <> prettyShow defName
+      _ -> genericError $ "Cannot compile: " <> prettyShow defName

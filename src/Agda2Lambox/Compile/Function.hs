@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, DataKinds #-}
+{-# LANGUAGE NamedFieldPuns, DataKinds, OverloadedStrings #-}
 -- | Convert Agda functions to λ□ constant declarations
 module Agda2Lambox.Compile.Function 
   ( compileFunction
@@ -11,8 +11,9 @@ import Data.Maybe ( isNothing, fromMaybe )
 
 import Agda.Syntax.Abstract.Name ( QName, qnameModule )
 import Agda.TypeChecking.Monad.Base hiding ( None )
+import Agda.TypeChecking.Pretty
 import Agda.Compiler.ToTreeless ( toTreeless )
-import Agda.Compiler.Backend ( getConstInfo, funInline )
+import Agda.Compiler.Backend ( getConstInfo, funInline, reportSDoc )
 import Agda.Syntax.Treeless ( EvaluationStrategy(EagerEvaluation) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Common ( hasQuantityω )
@@ -57,10 +58,13 @@ compileFunction t defn | not (shouldCompileFunction defn) = pure Nothing
 compileFunction (t :: Target t) defn@Defn{theDef, defType} = do
   let Function{funMutual = Just mutuals} = theDef
 
+  reportSDoc "agda2lambox.compile.function" 5 $
+    "Function mutuals:" <+> prettyTCM mutuals
+
   defs <- liftTCM $ mapM getConstInfo mutuals
 
   unless (all isFunction defs) $
-    fail "only mutually defined functions are supported."
+    genericError "Only mutually defined functions are supported."
 
   -- the mutual functions that we actually compile
   -- (so no with-generated functions, etc...)

@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, ImportQualifiedPost, DataKinds #-}
+{-# LANGUAGE NamedFieldPuns, ImportQualifiedPost, DataKinds, OverloadedStrings #-}
 -- | Convert Agda datatypes to λ□ inductive declarations
 module Agda2Lambox.Compile.Inductive
   ( compileInductive
@@ -17,7 +17,8 @@ import Agda.Syntax.Abstract.Name ( qnameModule, qnameName )
 import Agda.TypeChecking.Monad.Base hiding (None)
 import Agda.TypeChecking.Monad.Env ( withCurrentModule )
 import Agda.TypeChecking.Datatypes ( ConstructorInfo(..), getConstructorInfo, isDatatype )
-import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock )
+import Agda.TypeChecking.Pretty
+import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock, reportSDoc)
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Internal ( ConHead(..), unDom )
 import Agda.Utils.Monad ( unlessM )
@@ -32,6 +33,9 @@ import LambdaBox qualified as LBox
 compileInductive :: Target t -> Definition -> CompileM (Maybe (LBox.GlobalDecl t))
 compileInductive t defn@Defn{defName} = do
   mutuals <- liftTCM $ dataOrRecDefMutuals defn
+
+  reportSDoc "agda2lambox.compile.inductive" 5 $
+    "Inductive mutuals:" <+> prettyTCM mutuals
 
   {- NOTE(flupe):
      if mutuals is []:
@@ -59,7 +63,7 @@ compileInductive t defn@Defn{defName} = do
     defs <- liftTCM $ mapM getConstInfo items
 
     unless (all (isDataOrRecDef . theDef) defs) $
-      fail "mutually-defined datatypes/records *and* functions not supported."
+      genericError "Mutually-defined datatypes/records *and* functions not supported."
 
     bodies <- liftTCM $ forM defs $ actuallyConvertInductive t
 

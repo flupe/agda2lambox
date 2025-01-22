@@ -15,6 +15,7 @@ import Agda.Syntax.Common.Pretty ( prettyShow )
 
 import qualified LambdaBox as LBox
 import Agda2Lambox.Compile.Utils ( qnameToKName )
+import Agda2Lambox.Compile.Monad
 
 
 compileType :: Type -> TCM LBox.Type
@@ -31,16 +32,16 @@ compileType' = \case
     LBox.TArr <$> compileType (unDom dom)
               <*> compileType (unAbs abs)
 
-  Lit{}   -> fail "type-level literals not supported."
-  Lam{}   -> fail "type-level abstractions not supported."
-  Con{}   -> fail "type-level constructors not supported."
+  Lit{}   -> genericError "type-level literals not supported."
+  Lam{}   -> genericError "type-level abstractions not supported."
+  Con{}   -> genericError "type-level constructors not supported."
   Sort{}  -> pure LBox.TBox
   Level{} -> pure LBox.TBox
-  t       -> fail $ "unsupported type: " <> prettyShow t
+  t       -> genericError $ "unsupported type: " <> prettyShow t
 
 
 compileElims :: Elims -> TCM [LBox.Type]
 compileElims = mapM \case
   Apply a  -> compileType' $ unArg a
-  Proj{}   -> fail "type-level projection elim not supported."
-  IApply{} -> fail "type-level cubical path application not supported."
+  Proj{}   -> genericError "type-level projection elim not supported."
+  IApply{} -> genericError "type-level cubical path application not supported."

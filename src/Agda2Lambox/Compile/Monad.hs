@@ -4,6 +4,8 @@ module Agda2Lambox.Compile.Monad
   ( CompileM
   , requireDef
   , compileLoop
+  , genericError
+  , genericDocError
   ) where
 
 import Control.Monad ( unless )
@@ -14,10 +16,11 @@ import Data.Set qualified as Set
 import Queue.Ephemeral ( EphemeralQueue(..) )
 import Queue.Ephemeral qualified as Queue
 
-import Agda.Compiler.Backend ( QName, Definition, getConstInfo, MonadDebug, reportSDoc )
-import Agda.TypeChecking.Monad.Base ( TCM, MonadTCEnv, MonadTCM(liftTCM), MonadTCState, MonadTCEnv, HasOptions )
+import Agda.Compiler.Backend ( QName, Definition, getConstInfo, MonadDebug, reportSDoc, MonadTrace, ReadTCState, MonadTCError, TCErr )
+import Agda.TypeChecking.Monad.Base ( TCM, MonadTCEnv, MonadTCM(liftTCM), MonadTCState, MonadTCEnv, HasOptions, genericError, genericDocError, internalError)
 import Agda.Utils.List ( mcons )
 import Agda.TypeChecking.Pretty
+import Control.Monad.Error.Class (MonadError)
 
 -- | Backend compilation state.
 data CompileState = CompileState
@@ -42,8 +45,8 @@ initState qs = CompileState
 -- | Backend compilation monad.
 newtype CompileM a = Compile (StateT CompileState TCM a)
   deriving newtype (Functor, Applicative, Monad)
-  deriving newtype (MonadIO, MonadFail, MonadDebug)
-  deriving newtype (MonadTCEnv, MonadTCState, HasOptions, MonadTCM)
+  deriving newtype (MonadIO, MonadFail, MonadDebug, ReadTCState, MonadTrace)
+  deriving newtype (MonadError TCErr, MonadTCEnv, MonadTCState, HasOptions, MonadTCM)
 
 -- | Require a definition to be compiled.
 requireDef :: QName -> CompileM ()

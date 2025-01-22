@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, DerivingVia, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns, DerivingVia #-}
 module Agda2Lambox.Compile.Term
   ( compileTerm
   ) where
@@ -28,7 +28,7 @@ import LambdaBox.Names ( Name(..) )
 import LambdaBox ( Term(..) )
 import LambdaBox qualified as LBox
 import Agda2Lambox.Compile.Utils
-import Agda2Lambox.Compile.Monad ( CompileM, requireDef )
+import Agda2Lambox.Compile.Monad
 
 
 -- * Term compilation monad
@@ -84,12 +84,19 @@ compileTerm ms = runC . withMutuals ms . compileTermC
 compileTermC :: TTerm -> C LBox.Term
 compileTermC = \case
   TVar  n -> pure $ LRel n
-  TPrim p -> fail "primitives not supported"
+  TPrim p -> genericError "primitives not supported"
 
+  -- NOTE(flupe):
+  -- Assumption:
+  --   the only Defs remaining after the treeless translation
+  --   are computationally relevant.
+  --   - they cannot be propositions.
+  --   - they cannot be types.
   TDef qn -> do
     CompileEnv{mutuals, boundVars} <- ask
     case qn `elemIndex` mutuals of
-      Nothing -> do lift $ requireDef qn; pure $ LConst $ qnameToKName qn
+      Nothing -> do lift $ requireDef qn
+                    pure $ LConst $ qnameToKName qn
       Just i  -> pure $ LRel  $ i + boundVars
 
   TCon q -> do
@@ -98,7 +105,8 @@ compileTermC = \case
 
   TApp (TCon q) args -> do
     lift $ requireDef q
-    liftTCM . toConApp q =<< traverse compileTermC args
+    traverse compileTermC args
+      >>= liftTCM . toConApp q
   -- ^ For dealing with fully-applied constructors
 
   TApp u es -> do
@@ -115,7 +123,7 @@ compileTermC = \case
 
   TCase n CaseInfo{..} dt talts ->
     case caseErased of
-      Erased _    -> fail "Erased matches not supported."
+      Erased _    -> genericError "Erased matches not supported."
       NotErased _ -> do
         cind  <- compileCaseType caseType
         LCase cind 0 (LRel n) <$> traverse compileAlt talts
@@ -124,8 +132,8 @@ compileTermC = \case
   TSort   -> return LBox
   TErased -> return LBox
 
-  TCoerce tt  -> fail "Coerces not supported."
-  TError terr -> fail "Errors not supported."
+  TCoerce tt  -> genericError "Coerces not supported."
+  TError terr -> genericError "Errors not supported."
 
 compileLit :: Literal -> C LBox.Term
 compileLit = \case
@@ -139,18 +147,18 @@ compileLit = \case
     lift $ requireDef qn
     liftTCM $ foldrM ($) z ss
 
-  l -> fail $ "unsupported literal: " <> prettyShow l
+  l -> genericError $ "unsupported literal: " <> prettyShow l
 
 compileCaseType :: CaseType -> C LBox.Inductive
 compileCaseType = \case
   CTData qn -> do lift $ requireDef qn
                   liftTCM $ toInductive qn
-  _         -> fail "case type not supported"
+  _         -> genericError "case type not supported"
 
 
 compileAlt :: TAlt -> C ([LBox.Name], LBox.Term)
 compileAlt = \case
   TACon{..}   -> let names = take aArity $ repeat LBox.Anon
                  in (names,) <$> underBinders aArity (compileTermC aBody)
-  TALit{..}   -> fail "literal patterns not supported"
-  TAGuard{..} -> fail "case guards not supported"
+  TALit{..}   -> genericError "literal patterns not supported"
+  TAGuard{..} -> genericError "case guards not supported"

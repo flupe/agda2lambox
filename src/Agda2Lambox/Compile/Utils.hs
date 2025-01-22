@@ -38,7 +38,7 @@ dataOrRecDefMutuals d = do
   case theDef d of
     Datatype{dataMutual} -> pure $ fromMaybe [] dataMutual
     Record  {recMutual}  -> pure $ fromMaybe [] recMutual
-    _                    -> fail "not a datatype or record"
+    _                    -> internalError "Not a datatype or record"
 
 dataOrRecMutuals :: QName -> TCM [QName]
 dataOrRecMutuals q = dataOrRecDefMutuals =<< getConstInfo q
