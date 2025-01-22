@@ -10,10 +10,9 @@ data Type
   | TAny
   | TArr Type Type
   | TApp Type Type
-  -- NOTE(Cas):
-  -- According to the Coq file, the int is the "Level of type variable".
-  -- Unclear whether this would be a De Bruijn level or universe level.
   | TVar Int
+      -- ^ Reference to a type variable.
+      --   Uses De Bruijn *levels* and NOT indices.
   | TInd Inductive
   | TConst KerName
 

@@ -6,6 +6,7 @@ module Agda2Lambox.Compile.Monad
   , compileLoop
   , genericError
   , genericDocError
+  , internalError
   ) where
 
 import Control.Monad ( unless )
@@ -16,8 +17,11 @@ import Data.Set qualified as Set
 import Queue.Ephemeral ( EphemeralQueue(..) )
 import Queue.Ephemeral qualified as Queue
 
-import Agda.Compiler.Backend ( QName, Definition, getConstInfo, MonadDebug, reportSDoc, MonadTrace, ReadTCState, MonadTCError, TCErr )
-import Agda.TypeChecking.Monad.Base ( TCM, MonadTCEnv, MonadTCM(liftTCM), MonadTCState, MonadTCEnv, HasOptions, genericError, genericDocError, internalError)
+import Agda.Syntax.Abstract (QName)
+import Agda.Compiler.Backend (getConstInfo)
+import Agda.TypeChecking.Monad (MonadDebug, MonadTrace, MonadAddContext)
+import Agda.TypeChecking.Monad.Debug (MonadDebug, reportSDoc)
+import Agda.TypeChecking.Monad.Base hiding (initState)
 import Agda.Utils.List ( mcons )
 import Agda.TypeChecking.Pretty
 import Control.Monad.Error.Class (MonadError)
@@ -47,6 +51,7 @@ newtype CompileM a = Compile (StateT CompileState TCM a)
   deriving newtype (Functor, Applicative, Monad)
   deriving newtype (MonadIO, MonadFail, MonadDebug, ReadTCState, MonadTrace)
   deriving newtype (MonadError TCErr, MonadTCEnv, MonadTCState, HasOptions, MonadTCM)
+  deriving newtype (MonadAddContext, MonadReduce)
 
 -- | Require a definition to be compiled.
 requireDef :: QName -> CompileM ()

@@ -18,15 +18,19 @@ import Agda.TypeChecking.Monad.Base hiding (None)
 import Agda.TypeChecking.Monad.Env ( withCurrentModule )
 import Agda.TypeChecking.Datatypes ( ConstructorInfo(..), getConstructorInfo, isDatatype )
 import Agda.TypeChecking.Pretty
-import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock, reportSDoc)
+import Agda.TypeChecking.Telescope (telViewUpTo, piApplyM, teleArgs, telView)
+import Agda.TypeChecking.Substitute (TelView, TelV(theTel))
+import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock, reportSDoc, AddContext (addContext))
 import Agda.Syntax.Common.Pretty ( prettyShow )
-import Agda.Syntax.Internal ( ConHead(..), unDom )
+import Agda.Syntax.Common (Arg)
+import Agda.Syntax.Internal ( ConHead(..), unDom, Term)
 import Agda.Utils.Monad ( unlessM )
 
 import Agda.Utils ( isDataOrRecDef )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
+import Agda2Lambox.Compile.Type
 import LambdaBox qualified as LBox
 
 -- | Toplevel conversion from a datatype/record definition to a Lambdabox declaration.
@@ -73,18 +77,44 @@ compileInductive t defn@Defn{defName} = do
       , indBodies = NEL.toList bodies
       }
 
-actuallyConvertInductive :: Target t -> Definition -> TCM (LBox.OneInductiveBody t)
-actuallyConvertInductive (t :: Target t) Defn{defName, theDef, defMutual} = case theDef of
+actuallyConvertInductive :: forall t. Target t -> Definition -> TCM (LBox.OneInductiveBody t)
+actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
   Datatype{..} -> do
+    params <- theTel <$> telViewUpTo dataPars (defType defn)
 
-    ctors :: [LBox.ConstructorBody t]
-      <- forM dataCons \cname -> do
-           DataCon arity <- getConstructorInfo cname
-           return LBox.Constructor
-             { cstrName  = prettyShow $ qnameName cname
-             , cstrArgs  = arity
-             , cstrTypes = catchall t $ []
-             }
+    reportSDoc "agda2lambox.compile.inductive" 10 $
+      "Datatype parameters:" <+> prettyTCM params
+
+    -- NOTE(flupe):
+    -- Type variables are bound and referred to using De Bruijn levels.
+    -- That's why we reverse the list here.
+    let pvars :: [Arg Term] = reverse $ teleArgs params
+
+    -- TODO(flupe)
+    tyvars <- whenTyped t $ forM pvars \_ ->
+      pure LBox.TypeVarInfo 
+              { tvarName      = LBox.Anon
+              , tvarIsLogical = False
+              , tvarIsArity   = False
+              , tvarIsSort    = False
+              }
+
+    ctors :: [LBox.ConstructorBody t] <-
+      forM dataCons \cname -> do
+        DataCon arity <- getConstructorInfo cname
+
+        typs <- whenTyped t do
+          conType <- liftTCM $ (`piApplyM` pvars) =<< defType <$> getConstInfo cname
+          conTel  <- toList . theTel <$> telView conType
+
+          forM conTel \dom ->
+            (LBox.Anon,) <$> compileType (unDom dom)
+
+        pure LBox.Constructor
+          { cstrName  = prettyShow $ qnameName cname
+          , cstrArgs  = arity
+          , cstrTypes = typs
+          }
 
     pure LBox.OneInductive
       { indName          = prettyShow $ qnameName defName
@@ -92,14 +122,16 @@ actuallyConvertInductive (t :: Target t) Defn{defName, theDef, defMutual} = case
       , indKElim         = LBox.IntoAny -- TODO(flupe)
       , indCtors         = ctors
       , indProjs         = []
-      , indTypeVars      = catchall t $ []
+      , indTypeVars      = tyvars
       }
 
   Record{..} -> do
 
     let ConHead{conName, conFields} = recConHead
-        fields :: [LBox.ProjectionBody t] =
-          flip LBox.Projection (catchall t LBox.TBox) . prettyShow . qnameName . unDom <$> recFields
+
+    -- TODO
+    tyvars  <- whenTyped t $ pure []
+    contyps <- whenTyped t $ pure []
 
     pure LBox.OneInductive
       { indName          = prettyShow $ qnameName defName
@@ -109,10 +141,10 @@ actuallyConvertInductive (t :: Target t) Defn{defName, theDef, defMutual} = case
           [ LBox.Constructor
               (prettyShow $ qnameName conName)
               (length conFields)
-              $ catchall t []
+              contyps
           ]
-      , indProjs         = fields
-      , indTypeVars      = catchall t []
+      , indProjs         = []
+      , indTypeVars      = tyvars
       }
 
   -- { indFinite = maybe LBox.BiFinite inductionToRecKind recInduction

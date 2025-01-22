@@ -6,9 +6,9 @@ module Agda2Lambox.Compile.Target
   , WhenTyped(..)
   , getTyped
   , whenTyped
-  , catchall
   ) where
 
+import Data.Foldable (Foldable(foldMap))
 import Control.DeepSeq ( NFData(rnf) )
 import Data.Kind ( Type )
 
@@ -36,6 +36,10 @@ instance Applicative (WhenTyped Typed) where
 instance Monad (WhenTyped Typed) where
   Some x >>= f = f x
 
+instance Foldable (WhenTyped t) where
+  foldMap f None     = mempty
+  foldMap f (Some x) = f x
+
 
 -- | Retrieve a value when it's there for sure.
 getTyped :: WhenTyped Typed a ->  a
@@ -49,9 +53,3 @@ whenTyped ToTyped   x = Some <$> x
 instance NFData (Target t) where
   rnf ToTyped   = ()
   rnf ToUntyped = ()
-
--- TODO(flupe): remove this alias
--- | Wrap a default value.
-catchall :: Target t -> a -> WhenTyped t a
-catchall ToUntyped _ = None
-catchall ToTyped   x = Some x

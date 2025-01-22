@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances #-}
 module Agda2Lambox.Compile.Type
   ( compileType
+  , compileTele
   ) where
 
 
@@ -38,6 +39,26 @@ compileType' = \case
   Sort{}  -> pure LBox.TBox
   Level{} -> pure LBox.TBox
   t       -> genericError $ "unsupported type: " <> prettyShow t
+
+-- See: https://github.com/MetaCoq/metacoq/blob/coq-8.20/erasure/theories/Typed/Erasure.v#L780-L817
+-- | Compile a telescope (of parameters) into a list of λ□ type variables.
+compileTele :: Tele (Dom Type) -> TCM [LBox.TypeVarInfo]
+compileTele tel =
+  telToList tel
+  & map unDom
+  & traverse \(argname, t) -> do
+    undefined
+    pure LBox.TypeVarInfo
+      { tvarName      = LBox.Named argname
+      , tvarIsLogical = False
+          -- ^ type is logical if it is "a proposition when fully applied"
+          --    i.e t       : Prop =>  t is an arity
+          --        t a₁ a₂ : Prop =>  t is an arity
+      , tvarIsArity   = False
+          -- ^ type t is an arity if it is "an n-ary dependent function ending with a sort"
+      , tvarIsSort    = False
+          -- ^ t : Prop?
+      }
 
 
 compileElims :: Elims -> TCM [LBox.Type]
