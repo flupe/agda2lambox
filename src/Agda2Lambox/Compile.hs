@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, DataKinds #-}
+{-# LANGUAGE NamedFieldPuns, DataKinds, OverloadedStrings #-}
 module Agda2Lambox.Compile 
   ( compile
   ) where
@@ -10,6 +10,7 @@ import Agda.Compiler.Backend
 import Agda.Syntax.Internal ( QName )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.TypeChecking.Monad ( liftTCM, getConstInfo )
+import Agda.TypeChecking.Pretty
 import Agda.Utils.Monad ( whenM )
 
 import Agda.Utils ( hasPragma, isDataOrRecDef, treeless )
@@ -33,7 +34,7 @@ compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
 
 compileDefinition :: Target t -> Definition -> CompileM (Maybe (KerName, GlobalDecl t))
 compileDefinition target defn@Defn{..} = do
-  liftIO $ putStrLn $ "Compiling definition: " <> prettyShow defName
+  reportSDoc "agda2lambox.compile" 1 $ "Compiling definition: " <+> prettyTCM defName
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
 
@@ -48,8 +49,8 @@ compileDefinition target defn@Defn{..} = do
       d | isDataOrRecDef d -> compileInductive target defn
 
       Primitive{..} -> do
-        liftIO $ putStrLn $ "Found primitive: " <> prettyShow defName
-        liftIO $ putStrLn $ "Compiling it as axiom."
+        reportSDoc "agda2lambox.compile" 5 $
+          "Found primitive: " <> prettyTCM defName <> ". Compiling it as axiom."
 
         typ <- liftTCM $ whenTyped target $ ([],) <$> compileType defType
         pure $ Just $ ConstantDecl $ ConstantBody typ Nothing

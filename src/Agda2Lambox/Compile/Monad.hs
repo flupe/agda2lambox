@@ -1,4 +1,4 @@
-{-# LANGUAGE DerivingVia, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DerivingVia, GeneralizedNewtypeDeriving, OverloadedStrings #-}
 -- | Compilation monad.
 module Agda2Lambox.Compile.Monad
   ( CompileM
@@ -14,10 +14,10 @@ import Data.Set qualified as Set
 import Queue.Ephemeral ( EphemeralQueue(..) )
 import Queue.Ephemeral qualified as Queue
 
-import Agda.Compiler.Backend ( QName, Definition, getConstInfo )
+import Agda.Compiler.Backend ( QName, Definition, getConstInfo, MonadDebug, reportSDoc )
 import Agda.TypeChecking.Monad.Base ( TCM, MonadTCEnv, MonadTCM(liftTCM), MonadTCState, MonadTCEnv, HasOptions )
 import Agda.Utils.List ( mcons )
-import Agda.Syntax.Common.Pretty (prettyShow)
+import Agda.TypeChecking.Pretty
 
 -- | Backend compilation state.
 data CompileState = CompileState
@@ -42,19 +42,20 @@ initState qs = CompileState
 -- | Backend compilation monad.
 newtype CompileM a = Compile (StateT CompileState TCM a)
   deriving newtype (Functor, Applicative, Monad)
-  deriving newtype (MonadIO, MonadFail)
+  deriving newtype (MonadIO, MonadFail, MonadDebug)
   deriving newtype (MonadTCEnv, MonadTCState, HasOptions, MonadTCM)
-
--- deriving newtype (MonadState CompileState)
--- NOTE(flupe): safe to not export this, to make sure the queue is indeed ephemeral
 
 -- | Require a definition to be compiled.
 requireDef :: QName -> CompileM ()
 requireDef q = Compile $ do
   seen <- gets seenDefs
+
   -- a name is only added to the queue if we haven't seen it yet
   unless (Set.member q seen) do
-    liftIO $ putStrLn $ "Requiring definition: " <> prettyShow q
+
+    reportSDoc "agda2lambox.compile.require" 10 $
+      "Requiring definition:" <+> prettyTCM q
+
     modify \ s -> s
       { seenDefs     = Set.insert q seen
       , compileQueue = Queue.enqueue q $ compileQueue s

@@ -13,7 +13,7 @@ import Data.List ( elemIndex )
 import Data.Maybe ( fromMaybe, listToMaybe )
 
 import Agda.Syntax.Abstract.Name
-import Agda.Syntax.Common.Pretty ( prettyShow )
+import Agda.Syntax.Common.Pretty ( prettyShow, Doc )
 import Agda.TypeChecking.Datatypes ( getConstructors, getConstructorData )
 import Agda.TypeChecking.Monad.Base ( TCM )
 import Agda.Compiler.Backend 
@@ -60,4 +60,3 @@ toConApp qn es = do
   ind  <- toInductive dt
   let idx = fromMaybe 0 $ qn `elemIndex` ctrs
   pure $ LBox.LConstruct ind idx es
-
