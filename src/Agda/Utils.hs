@@ -57,6 +57,8 @@ treeless = TT.toTreelessWith compilerPipeline (EagerEvaluation, TT.EraseUnused)
     TT.Sequential
       -- NOTE (flupe): this is the default Agda treeless pipeline
       --               with the builtin pass removed.
+      -- TODO(flupe):
+      --   we most likely want the eliminateCaseDefaults transformation to have exhaustive matches
       -- [ TT.compilerPass "builtin" (30 + v) "builtin translation" $ const TT.translateBuiltins
       [ TT.FixedPoint 5 $ TT.Sequential
         [ TT.compilerPass "simpl"  (30 + v) "simplification"     $ const TT.simplifyTTerm

@@ -39,7 +39,7 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
     case theDef of
 
       Axiom{} -> do
-        typ <- whenTyped target $ ([],) <$> compileType defType
+        typ <- whenTyped target $ ([],) <$> compileType 0 defType
         pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
 
       Constructor{conData} -> Nothing <$ requireDef conData
@@ -52,7 +52,7 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
         reportSDoc "agda2lambox.compile" 5 $
           "Found primitive: " <> prettyTCM defName <> ". Compiling it as axiom."
 
-        typ <- whenTyped target $ ([],) <$> compileType defType
+        typ <- whenTyped target $ ([],) <$> compileType 0 defType
         pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
 
       _ -> genericError $ "Cannot compile: " <> prettyShow defName

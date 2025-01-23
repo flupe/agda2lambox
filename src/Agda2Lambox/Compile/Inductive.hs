@@ -113,7 +113,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
           conType <- liftTCM $ (`piApplyM` pvars) =<< defType <$> getConstInfo cname
           conTel  <- toList . theTel <$> telView conType
 
-          forM conTel \dom -> (LBox.Anon,) <$> compileType (unDom dom)
+          forM conTel \dom -> (LBox.Anon,) <$> compileType dataPars (unDom dom)
 
         pure LBox.Constructor
           { cstrName  = prettyShow $ qnameName cname
@@ -145,7 +145,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
     -- constructor arg types
     typ <- whenTyped t $
       let conTel  = toList $ recTel `apply` pvars
-      in forM conTel \dom -> (LBox.Anon,) <$> compileType (unDom dom)
+      in forM conTel \dom -> (LBox.Anon,) <$> compileType recPars (unDom dom)
 
     pure LBox.OneInductive
       { indName          = prettyShow $ qnameName defName

@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances #-}
 module Agda2Lambox.Compile.Type
   ( compileType
+  , compileTopLevelType
   , compileTele
   ) where
 
@@ -58,8 +59,8 @@ compileTopLevelType :: Type -> CompileM (LBox.Type)
 compileTopLevelType = undefined
 
 -- | Compile a type, given a number of type variables in scope.
-compileType :: Type -> CompileM LBox.Type
-compileType = runC 0 . compileType'
+compileType :: Int -> Type -> CompileM LBox.Type
+compileType tvars = runC tvars . compileType'
 
 compileType' :: Type -> C LBox.Type
 compileType' = compileType'' . unEl

@@ -90,24 +90,37 @@ data CoqModule t = CoqModule
 ----------------------------
 
 instance Pretty (ConstructorBody t) where
-  pretty Constructor{..} = pretty cstrName <+> parens (pretty cstrArgs <+> "arg(s)")
+  pretty Constructor{..} =
+    vcat
+    [ pretty cstrName <+> parens (pretty cstrArgs <+> "arg(s)")
+    , nest 2 $ flip foldMap cstrTypes \args ->
+        vcat $ flip map args \(name, typ) ->
+          pretty name  <+> ":" <+> pretty typ
+    ]
+
+instance Pretty TypeVarInfo where
+  pretty TypeVarInfo{..} = pretty tvarName
 
 instance Pretty (OneInductiveBody t) where
   pretty OneInductive{..} = vcat
     [ pretty indName
-    , "constructors:" <+> pretty indCtors
+    , flip foldMap indTypeVars \tvs -> "type variables: " <+> pretty tvs
+    , nest 2 $ hang "constructors:" 2 $ vcat $ map pretty indCtors
     ]
 
 instance Pretty (GlobalDecl t) where
   pretty = \case
     ConstantDecl ConstantBody{..} ->
-      vsep
-      [ hang "constant:" 2 $ pretty cstBody
-      , foldMap (("type:" <+>) . pretty) cstType
-      ]
+      hang "constant declaration:" 2 $ vcat
+        [ flip foldMap cstType \(tvs, typ) -> 
+            vcat [ "type variables:" <+> pretty tvs
+                 ,  "type:" <+> pretty typ
+                  ]
+        , "body:" <+> pretty cstBody
+        ]
 
     InductiveDecl MutualInductive{..} ->
-      hang "mutual inductive(s):" 2 $ 
+      hang "mutual inductive(s):" 2 $
         vsep $ map pretty indBodies
 
 instance Pretty (GlobalEnv t) where
