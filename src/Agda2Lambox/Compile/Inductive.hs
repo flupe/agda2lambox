@@ -77,10 +77,6 @@ compileInductive t defn@Defn{defName} = do
       , indBodies = NEL.toList bodies
       }
 
--- TODO(flupe):
---   currently the compilation of constructor types is incorrect
---   indeed, it doesn't account for the fact that for a given constructor,
---   each argument is in scope for the next ones
 
 -- TODO(flupe):
 --  actually really unify the compilation of both, they do exactly the same thing
@@ -95,7 +91,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
 
     -- TODO(flupe)
     tyvars <- whenTyped t $ forM pvars \_ ->
-      pure LBox.TypeVarInfo 
+      pure LBox.TypeVarInfo
               { tvarName      = LBox.Anon
               , tvarIsLogical = False
               , tvarIsArity   = False
@@ -106,7 +102,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
       forM dataCons \cname -> do
         DataCon arity <- liftTCM $ getConstructorInfo cname
 
-        typs <- whenTyped t do
+        conTypeInfo <- whenTyped t do
           conType <- liftTCM $ (`piApplyM` pvars) =<< defType <$> getConstInfo cname
           conTel  <- toList . theTel <$> telView conType
           compileArgs dataPars conTel
@@ -114,7 +110,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
         pure LBox.Constructor
           { cstrName  = prettyShow $ qnameName cname
           , cstrArgs  = arity
-          , cstrTypes = typs
+          , cstrTypes = conTypeInfo
           }
 
     pure LBox.OneInductive
@@ -138,8 +134,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
     -- TODO
     tyvars  <- whenTyped t $ pure []
 
-    -- constructor arg types
-    typ <- whenTyped t $
+    conTypeInfo <- whenTyped t $
       let conTel  = toList $ recTel `apply` pvars
       in compileArgs recPars conTel
 
@@ -151,7 +146,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
           [ LBox.Constructor
               (prettyShow $ qnameName conName)
               (length conFields)
-              typ
+              conTypeInfo
           ]
       , indProjs         = []
       , indTypeVars      = tyvars
