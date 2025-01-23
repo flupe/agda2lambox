@@ -72,7 +72,7 @@ compileFunction (t :: Target t) defn@Defn{theDef, defType} = do
   let mnames = map defName mdefs
 
   -- compile function type, if necessary
-  typ <- liftTCM $ whenTyped t $ ([],) <$> compileType defType
+  typ <- whenTyped t $ ([],) <$> compileType defType
 
   let builder :: LBox.Term -> Maybe (LBox.GlobalDecl t)
       builder = Just . ConstantDecl . ConstantBody typ . Just

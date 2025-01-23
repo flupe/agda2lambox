@@ -19,8 +19,8 @@ import Agda.TypeChecking.Monad.Env ( withCurrentModule )
 import Agda.TypeChecking.Datatypes ( ConstructorInfo(..), getConstructorInfo, isDatatype )
 import Agda.TypeChecking.Pretty
 import Agda.TypeChecking.Telescope (telViewUpTo, piApplyM, teleArgs, telView)
-import Agda.TypeChecking.Substitute (TelView, TelV(theTel))
-import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock, reportSDoc, AddContext (addContext))
+import Agda.TypeChecking.Substitute (TelView, TelV(theTel), apply)
+import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock, reportSDoc, AddContext (addContext), constructorForm)
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Common (Arg)
 import Agda.Syntax.Internal ( ConHead(..), unDom, Term)
@@ -69,7 +69,7 @@ compileInductive t defn@Defn{defName} = do
     unless (all (isDataOrRecDef . theDef) defs) $
       genericError "Mutually-defined datatypes/records *and* functions not supported."
 
-    bodies <- liftTCM $ forM defs $ actuallyConvertInductive t
+    bodies <- forM defs $ actuallyConvertInductive t
 
     return $ Just $ LBox.InductiveDecl $ LBox.MutualInductive
       { indFinite = LBox.Finite -- TODO(flupe)
@@ -77,11 +77,17 @@ compileInductive t defn@Defn{defName} = do
       , indBodies = NEL.toList bodies
       }
 
-actuallyConvertInductive :: forall t. Target t -> Definition -> TCM (LBox.OneInductiveBody t)
+-- TODO(flupe):
+--   currently the compilation of constructor types is incorrect
+--   indeed, it doesn't account for the fact that for a given constructor,
+--   each argument is in scope for the next ones
+
+-- TODO(flupe):
+--  actually really unify the compilation of both, they do exactly the same thing
+actuallyConvertInductive :: forall t. Target t -> Definition -> CompileM (LBox.OneInductiveBody t)
 actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
   Datatype{..} -> do
     params <- theTel <$> telViewUpTo dataPars (defType defn)
-
     reportSDoc "agda2lambox.compile.inductive" 10 $
       "Datatype parameters:" <+> prettyTCM params
 
@@ -101,14 +107,13 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
 
     ctors :: [LBox.ConstructorBody t] <-
       forM dataCons \cname -> do
-        DataCon arity <- getConstructorInfo cname
+        DataCon arity <- liftTCM $ getConstructorInfo cname
 
         typs <- whenTyped t do
           conType <- liftTCM $ (`piApplyM` pvars) =<< defType <$> getConstInfo cname
           conTel  <- toList . theTel <$> telView conType
 
-          forM conTel \dom ->
-            (LBox.Anon,) <$> compileType (unDom dom)
+          forM conTel \dom -> (LBox.Anon,) <$> compileType (unDom dom)
 
         pure LBox.Constructor
           { cstrName  = prettyShow $ qnameName cname
@@ -129,9 +134,18 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
 
     let ConHead{conName, conFields} = recConHead
 
+    params <- theTel <$> telViewUpTo recPars (defType defn)
+    reportSDoc "agda2lambox.compile.inductive" 10 $
+      "Record parameters:" <+> prettyTCM params
+    let pvars :: [Arg Term] = reverse $ teleArgs params
+
     -- TODO
     tyvars  <- whenTyped t $ pure []
-    contyps <- whenTyped t $ pure []
+
+    -- constructor arg types
+    typ <- whenTyped t $
+      let conTel  = toList $ recTel `apply` pvars
+      in forM conTel \dom -> (LBox.Anon,) <$> compileType (unDom dom)
 
     pure LBox.OneInductive
       { indName          = prettyShow $ qnameName defName
@@ -141,7 +155,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
           [ LBox.Constructor
               (prettyShow $ qnameName conName)
               (length conFields)
-              contyps
+              typ
           ]
       , indProjs         = []
       , indTypeVars      = tyvars

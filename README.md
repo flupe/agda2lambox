@@ -42,6 +42,7 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
   - [x] With-generated lambdas
   - [ ] Module applications
   - [ ] Projection-like
+  - [ ] Check that treeless generates exhaustive cases
 - [ ] Support primitives (ints and floats)
 
 - [ ] Setup compilation to Wasm/Rust using Certicoq
@@ -62,8 +63,8 @@ Things that ought to be implemented, but not right now.
 - [Verified Extraction from Coq to OCaml](https://github.com/yforster/coq-verified-extraction/)
   and its [accompanying paper](https://dl.acm.org/doi/10.1145/3656379)
 - [Certified Erasure for Coq, in Coq](https://inria.hal.science/hal-04077552)
-- [Syntax of LambdaBox in MetaCoq](https://github.com/MetaCoq/metacoq/blob/coq-8.20/erasure/theories/Typed/ExAst.v) 
-- [Erasure of types in MetaCoq](https://github.com/MetaCoq/metacoq/blob/coq-8.20/erasure/theories/Typed/Erasure.v#L765)
+- [Extracting functional programs from Coq, in Coq](https://arxiv.org/pdf/2108.02995)
+- [Lambdabox syntax and untyped environments](https://github.com/MetaCoq/metacoq/blob/coq-8.20/erasure/theories/EAst.v) 
+- [Lambdabox typed environments](https://github.com/MetaCoq/metacoq/blob/coq-8.20/erasure/theories/Typed/ExAst.v) 
 - [Coq Extraction Pipeline](https://gist.github.com/4ever2/991007b4418b0ba44f2ee7ed51147e19)
-- [MetaCoq Extracted Terms](https://metacoq.github.io/metacoq/html/MetaCoq.Erasure.EAst.html)
 - [Extraction Example](https://gist.github.com/4ever2/7fbfb3bf843c4773c933c2fdf6315b5c)

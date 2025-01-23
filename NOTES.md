@@ -120,7 +120,25 @@ All the remaining transformations optimize this program, but remain in λ□*.
     Rebuild the efficient lookup table.
 12. `constructors_as_blocks_transformation`:
     Eta-expand and fully apply constructors.
-    
+
     This is currently implemented on our side in the backend,
     but it makes way more sense to do it on the Coq side.
     Let's use this transformation!
+
+---
+
+- Actually, now that I get a better understanding of typed λ□ environments, it looks like
+  generation of the type information never fails.
+  Worst case, it's always `TBox`, but we try to generate as much valid types as we can.
+
+---
+
+- Type erasure is defined in this paper, from ConCert: https://arxiv.org/pdf/2108.02995
+  I should just look at what they describe.
+  I think I need something like:
+
+  ```hs
+  compileTopLevelType :: Type -> C ([TypeVarInfo], LamBox.Type)
+  
+  compileType :: Type -> C (LamBox.Type)
+  ```

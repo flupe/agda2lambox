@@ -38,7 +38,12 @@ data ProjectionBody t = Projection
 data TypeVarInfo = TypeVarInfo
   { tvarName      :: Name
   , tvarIsLogical :: Bool
+     -- ^ A parameter @t@ is *logical* if it is "a proposition when fully applied"
+     --    i.e @t : Prop@ means  t is logical,
+     --        @t a₁ a₂ : Prop@ means t is logical
   , tvarIsArity   :: Bool
+     -- ^ a parameter @t@ is an arity if it is a type when fully applied.
+     --     Consider @(T : Type → Type) (A : T Nat)@. @A@ is an arity, because @T : @
   , tvarIsSort    :: Bool
   }
 
@@ -96,7 +101,10 @@ instance Pretty (OneInductiveBody t) where
 instance Pretty (GlobalDecl t) where
   pretty = \case
     ConstantDecl ConstantBody{..} ->
-      hang "constant:" 2 $ pretty cstBody
+      vsep
+      [ hang "constant:" 2 $ pretty cstBody
+      , foldMap (("type:" <+>) . pretty) cstType
+      ]
 
     InductiveDecl MutualInductive{..} ->
       hang "mutual inductive(s):" 2 $ 

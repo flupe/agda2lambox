@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, DerivingVia #-}
+{-# LANGUAGE NamedFieldPuns, DerivingVia, OverloadedStrings #-}
 module Agda2Lambox.Compile.Term
   ( compileTerm
   ) where
@@ -17,7 +17,7 @@ import Agda.Compiler.Backend ( getConstInfo, theDef, pattern Datatype, dataMutua
 import Agda.Syntax.Abstract.Name ( ModuleName(..), QName(..) )
 import Agda.Syntax.Builtin ( builtinNat, builtinZero, builtinSuc )
 import Agda.Syntax.Common ( Erased(..) )
-import Agda.Syntax.Common.Pretty ( prettyShow )
+import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Literal
 import Agda.Syntax.Treeless ( TTerm(..), TAlt(..), CaseInfo(..), CaseType(..) )
 import Agda.TypeChecking.Datatypes ( getConstructorData, getConstructors )
@@ -149,16 +149,53 @@ compileLit = \case
 
   l -> genericError $ "unsupported literal: " <> prettyShow l
 
+compileLitPattern :: Literal -> C LBox.Term
+compileLitPattern = \case
+
+  LitNat i -> do
+    qn <- liftTCM $ getBuiltinName_ builtinNat
+    qz <- liftTCM $ getBuiltinName_ builtinZero
+    qs <- liftTCM $ getBuiltinName_ builtinSuc
+    z  <- liftTCM $ toConApp qz []
+    let ss = take (fromInteger i) $ repeat (toConApp qs . singleton)
+    lift $ requireDef qn
+    liftTCM $ foldrM ($) z ss
+
+  l -> genericError $ "unsupported literal: " <> prettyShow l
+
 compileCaseType :: CaseType -> C LBox.Inductive
 compileCaseType = \case
-  CTData qn -> do lift $ requireDef qn
-                  liftTCM $ toInductive qn
-  _         -> genericError "case type not supported"
+  CTData qn -> do 
+    lift $ requireDef qn
+    liftTCM $ toInductive qn
+  CTNat -> do
+    qn <- liftTCM $ getBuiltinName_ builtinNat
+    lift $ requireDef qn
+    liftTCM $ toInductive qn
+  ct -> genericError $ "Case type not supported: " <> show ct
 
+-- TODO: flupe
+--   literal patterns are a bit annoying.
+--   3 -> body
+--   should get compiled to:
+--   succ n -> case n of
+--     succ n -> case n of
+--       succ n -> case n of
+--         zero -> body
+--   but how do we handle the generation of other branches?
+--   perhaps there's already a treeless translation to prevent this
+--   to inverstigate...
 
 compileAlt :: TAlt -> C ([LBox.Name], LBox.Term)
 compileAlt = \case
   TACon{..}   -> let names = take aArity $ repeat LBox.Anon
                  in (names,) <$> underBinders aArity (compileTermC aBody)
-  TALit{..}   -> genericError "literal patterns not supported"
-  TAGuard{..} -> genericError "case guards not supported"
+
+  -- hardcoded support for zero nat literal pattern
+  TALit (LitNat 0) body -> do
+    qn <- liftTCM $ getBuiltinName_ builtinNat
+    lift $ requireDef qn
+    ([],) <$> compileTermC body
+
+  lit@TALit{..} -> genericError $ "Literal pattern not supported:" <> show lit
+  TAGuard{..}   -> genericError "case guards not supported"
