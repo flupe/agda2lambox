@@ -2,10 +2,12 @@
 module Agda2Lambox.Compile.Type
   ( compileType
   , compileTopLevelType
+  , compileArgs
   , compileTele
   ) where
 
 
+import Control.Category ((>>>))
 import Control.Monad.Reader
 import Control.Monad ( mapM )
 import Data.List ( foldl' )
@@ -28,7 +30,8 @@ import Agda2Lambox.Compile.Monad
 --     we should check that if k is below the amount of locally bound bars.
 --       If such => tBox.
 --       otherwise, it HAS to point to a type variable, and we 
---   
+--
+-- Also: drop datatype indices?
 
 -- | λ□ type compilation environment.
 data CompileEnv = CompileEnv
@@ -55,43 +58,70 @@ underBinder = local \e -> e { boundVars = boundVars e + 1 }
 type C a = ReaderT CompileEnv CompileM a
 
 
-compileTopLevelType :: Type -> CompileM (LBox.Type)
-compileTopLevelType = undefined
+-- TODO(flupe)
+compileTopLevelType :: Type -> CompileM ([LBox.TypeVarInfo], LBox.Type)
+compileTopLevelType typ = do
+  typ' <- compileType 0 typ
+  pure ([], typ')
 
 -- | Compile a type, given a number of type variables in scope.
 compileType :: Int -> Type -> CompileM LBox.Type
-compileType tvars = runC tvars . compileType'
+compileType tvars = runC tvars . compileTypeC
 
-compileType' :: Type -> C LBox.Type
-compileType' = compileType'' . unEl
+-- | Compile constructor arguments' types, given a set number of type variables.
+compileArgs :: Int -> [Dom Type] -> CompileM [(LBox.Name, LBox.Type)]
+compileArgs tvars = runC tvars . compileArgsC
+  where
+  compileArgsC :: [Dom Type] -> C [(LBox.Name, LBox.Type)]
+  compileArgsC [] = pure []
+  compileArgsC (dom:args) = do
+    let name = maybe LBox.Anon (LBox.Named . prettyShow) $ domName dom
+    typ <- compileTypeC $ unDom dom
+    ((name, typ):) <$> underBinder (compileArgsC args)
 
-compileType'' :: Term -> C LBox.Type
-compileType'' = \case
+compileTypeC :: Type -> C LBox.Type
+compileTypeC = compileTypeTermC . unEl
+
+compileTypeTermC :: Term -> C LBox.Type
+compileTypeTermC = unSpine >>> \case
   Var n es -> do
     CompileEnv{..} <- ask
     if n < boundVars then
       pure LBox.TBox -- NOTE(flupe): should we still apply the parameters to the box?
+
+    -- it's pointing to a type variable
     else do
-      let k = typeVars - (n - boundVars)
-      -- NOTE(flupe): reading the paper, type variables are restricted to Hindley-Milner
-      --              so cannot be type constructors: we don't compile elims
+      -- NOTE(flupe):
+      --   type variables are referenced using De Bruijn levels.
+      --   that's how we compute the appropriate level for the type var.
+      let k = typeVars - (n - boundVars) - 1
+
+      -- NOTE(flupe): 
+      --   type variables are restricted to Hindley-Milner,
+      --   so they cannot be type constructors: we don't compile elims
       pure $ LBox.TVar k
-      -- foldl' LBox.TApp (LBox.TVar k) <$> compileElims es
 
   Def q es -> do
-    -- TODO(flupe): check if it's an inductive, or a type alias
+    -- TODO(flupe):
+    --   check if it's an inductive, 
+    --   or a type alias
+
+    -- TODO(flupe): 
+    --   check if it's a projection:
+    --     if it is: should put box
     foldl' LBox.TApp (LBox.TConst $ qnameToKName q) <$> compileElims es
   Pi dom abs ->
-    LBox.TArr <$> compileType' (unDom dom)
-              <*> underBinder (compileType' (unAbs abs))
+    LBox.TArr <$> compileTypeC (unDom dom)
+              <*> underBinder (compileTypeC (unAbs abs))
 
   -- NOTE(flupe):
-  --  My current understanding of typed lambox is that the type translation 
+  --  My current understanding of typed lambox is that the type translation never fails.
+  --  worst case, we cannot generate nice types and fall back on □
   t       -> pure LBox.TBox
 
 compileElims :: Elims -> C [LBox.Type]
 compileElims = mapM \case
-  Apply a  -> compileType'' $ unArg a
+  Apply a  -> compileTypeTermC $ unArg a
   Proj{}   -> genericError "type-level projection elim not supported."
   IApply{} -> genericError "type-level cubical path application not supported."
 

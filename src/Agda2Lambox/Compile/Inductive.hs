@@ -91,10 +91,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
     reportSDoc "agda2lambox.compile.inductive" 10 $
       "Datatype parameters:" <+> prettyTCM params
 
-    -- NOTE(flupe):
-    -- Type variables are bound and referred to using De Bruijn levels.
-    -- That's why we reverse the list here.
-    let pvars :: [Arg Term] = reverse $ teleArgs params
+    let pvars :: [Arg Term] = teleArgs params
 
     -- TODO(flupe)
     tyvars <- whenTyped t $ forM pvars \_ ->
@@ -112,8 +109,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
         typs <- whenTyped t do
           conType <- liftTCM $ (`piApplyM` pvars) =<< defType <$> getConstInfo cname
           conTel  <- toList . theTel <$> telView conType
-
-          forM conTel \dom -> (LBox.Anon,) <$> compileType dataPars (unDom dom)
+          compileArgs dataPars conTel
 
         pure LBox.Constructor
           { cstrName  = prettyShow $ qnameName cname
@@ -137,7 +133,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
     params <- theTel <$> telViewUpTo recPars (defType defn)
     reportSDoc "agda2lambox.compile.inductive" 10 $
       "Record parameters:" <+> prettyTCM params
-    let pvars :: [Arg Term] = reverse $ teleArgs params
+    let pvars :: [Arg Term] = teleArgs params
 
     -- TODO
     tyvars  <- whenTyped t $ pure []
@@ -145,7 +141,7 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
     -- constructor arg types
     typ <- whenTyped t $
       let conTel  = toList $ recTel `apply` pvars
-      in forM conTel \dom -> (LBox.Anon,) <$> compileType recPars (unDom dom)
+      in compileArgs recPars conTel
 
     pure LBox.OneInductive
       { indName          = prettyShow $ qnameName defName
