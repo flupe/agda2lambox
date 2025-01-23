@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, BangPatterns #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, BangPatterns, NamedFieldPuns #-}
 
 -- | Agda utilities.
 module Agda.Utils where
@@ -9,9 +9,10 @@ import Data.Maybe ( isJust, isNothing )
 
 import Agda.Compiler.Backend ( getUniqueCompilerPragma )
 import Agda.Syntax.Abstract.Name
+import Agda.Syntax.Internal
 import Agda.TypeChecking.Monad.Base hiding ( conArity )
 import Agda.TypeChecking.Datatypes ( getConstructorInfo, ConstructorInfo(..) )
-import Agda.TypeChecking.Substitute ( raise )
+import Agda.TypeChecking.Substitute ( raise, TelV (theCore) )
 import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Treeless
 
@@ -22,6 +23,7 @@ import Agda.Compiler.Treeless.Simplify   qualified as TT
 import Agda.Compiler.Treeless.Identity   qualified as TT
 import Agda.Compiler.Treeless.Uncase     qualified as TT
 import Agda.Compiler.Treeless.AsPatterns qualified as TT
+import Agda.TypeChecking.Telescope (telView)
 
 
 -- * Miscellaneous
@@ -46,6 +48,32 @@ isFunDef = \case
   _ -> False
 
 isDataOrRecDef = liftA2 (||) isDataDef isRecDef
+
+getInductiveParams :: Defn -> Int
+getInductiveParams Datatype{dataPars} = dataPars
+getInductiveParams Record{recPars}    = recPars
+
+
+-- TODO: consider erased things to be logical
+--       so maybe take a Dom Type instead
+
+isLogical, isArity :: Type -> TCM Bool
+
+-- | Whether a type is logical.
+isLogical typ = do
+  tel <- telView typ
+  let sort = isSort $ unEl $ theCore $ tel
+  case sort of
+    Just (Univ UProp _) -> pure True
+    Just (Inf  UProp _) -> pure True
+    Just LevelUniv      -> pure True
+    Just SizeUniv       -> pure True
+    _                   -> pure False
+
+-- | Whether a type is an arity.
+isArity typ = do
+  tel <- telView typ
+  pure $ isJust $ isSort $ unEl $ theCore $ tel
 
 -- ** toTreeless custom pipeline
 

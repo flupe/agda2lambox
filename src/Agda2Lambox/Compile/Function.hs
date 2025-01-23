@@ -20,15 +20,17 @@ import Agda.Syntax.Common ( hasQuantityω )
 import Agda.Utils.Monad (guardWithError, whenM)
 import Agda.Utils.Lens ( (^.) )
 
-import Agda.Utils ( etaExpandCtor, treeless, pp )
+import Agda.Utils ( etaExpandCtor, treeless, pp, isRecordProjection )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
 import Agda2Lambox.Compile.Term ( compileTerm )
-import Agda2Lambox.Compile.Type ( compileType )
+import Agda2Lambox.Compile.Type ( compileTopLevelType, compileType )
 
 import LambdaBox qualified as LBox
 import LambdaBox.Env
+import Agda.TypeChecking.Telescope (telViewUpTo)
+import Agda.TypeChecking.Substitute (TelV(theCore))
 
 
 -- | Check whether a definition is a function.
@@ -55,8 +57,8 @@ shouldCompileFunction def@Defn{theDef} | Function{..} <- theDef
 -- | Convert a function definition to a λ□ declaration.
 compileFunction :: Target t -> Definition -> CompileM (Maybe (LBox.GlobalDecl t))
 compileFunction t defn | not (shouldCompileFunction defn) = pure Nothing
-compileFunction (t :: Target t) defn@Defn{theDef, defType} = do
-  let Function{funMutual = Just mutuals} = theDef
+compileFunction (t :: Target t) defn@Defn{defType} = do
+  let fundef@Function{funMutual = Just mutuals} = theDef defn
 
   reportSDoc "agda2lambox.compile.function" 5 $
     "Function mutuals:" <+> prettyTCM mutuals
@@ -71,8 +73,20 @@ compileFunction (t :: Target t) defn@Defn{theDef, defType} = do
   let mdefs  = filter shouldCompileFunction defs
   let mnames = map defName mdefs
 
-  -- compile function type, if necessary
-  typ <- whenTyped t $ ([],) <$> compileType 0 defType
+  -- (conditionally) compile type of function
+  typ <- whenTyped t $ case isRecordProjection fundef of
+    Nothing -> compileTopLevelType defType
+
+    -- if it is a (real) projection, drop the parameters from the type
+    Just (recName, _) -> do
+      Record{recPars} <- fmap theDef $ liftTCM $ getConstInfo recName
+      projType <- theCore <$> telViewUpTo recPars defType
+      -- TODO(flupe): retrieve the name of type variable
+      (take recPars $ repeat LBox.Anon,) <$> compileType recPars projType
+
+    -- TODO(flupe): ^ take care of projection-like functions
+    --                they should be eta-expanded somehow,
+    --                OR treated like projections
 
   let builder :: LBox.Term -> Maybe (LBox.GlobalDecl t)
       builder = Just . ConstantDecl . ConstantBody typ . Just

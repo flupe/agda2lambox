@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, FlexibleInstances #-}
+{-# LANGUAGE LambdaCase, FlexibleInstances, MultiWayIf #-}
 module Agda2Lambox.Compile.Type
   ( compileType
   , compileTopLevelType
@@ -12,61 +12,65 @@ import Control.Monad.Reader
 import Control.Monad ( mapM )
 import Data.List ( foldl' )
 import Data.Function ( (&) )
+import Data.Bifunctor ( second )
+import Data.Maybe ( isJust )
 
 import Agda.Syntax.Common ( unArg )
 import Agda.Syntax.Internal
-import Agda.TypeChecking.Monad.Base ( TCM )
+import Agda.TypeChecking.Monad.Base ( TCM, MonadTCM (liftTCM), Definition (theDef) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
+import Agda.Utils.Monad (ifM)
 
 import qualified LambdaBox as LBox
 import Agda2Lambox.Compile.Utils ( qnameToKName )
 import Agda2Lambox.Compile.Monad
+import Agda.Compiler.Backend (HasConstInfo(getConstInfo))
+import Agda.Utils (isDataOrRecDef, getInductiveParams, isLogical, isArity)
+import Agda.TypeChecking.Substitute (absBody, TelV (theCore))
+import Agda.TypeChecking.Telescope (telView)
 
--- NOTE(flupe):
---   strategy for type compilation (for future me)
---   like for terms, we need to keep track of bound variables.
---   In particular, in λ□ type syntax, variables refer to type variables, using DeBruijn *levels*.
---   So, when compiling var k,
---     we should check that if k is below the amount of locally bound bars.
---       If such => tBox.
---       otherwise, it HAS to point to a type variable, and we 
---
--- Also: drop datatype indices?
+-- | The kind of variables that are locally bound
+data VarType = TypeVar Int | IndVar | Other
 
 -- | λ□ type compilation environment.
 data CompileEnv = CompileEnv
-  { typeVars  :: Int
-    -- ^ Type variables, bound outside of the type.
-  , boundVars :: Int
-    -- ^ Amount of locally-bound variables.
+  { typeVars   :: Int
+    -- ^ How many type variables we have.
+  , boundVars  :: Int
+    -- ^ Amount of bound variables (including type variables)
+  , boundTypes :: [VarType]
+    -- ^ Information about the type variables in question.
+    -- Should be indexed using de Bruijn indices.
   }
 
+-- | Initialize compilation environment with a given number of type variables.
 initEnv :: Int -> CompileEnv
 initEnv tvs = CompileEnv
-  { typeVars  = tvs
-  , boundVars = 0
+  { typeVars   = tvs
+  , boundVars  = tvs
+  , boundTypes = reverse $ TypeVar <$> [0 .. tvs - 1]
   }
 
 runC :: Int -> C a -> CompileM a
 runC tvs m = runReaderT m (initEnv tvs)
 
 -- | Increment the number of locally-bound variables.
-underBinder :: C a -> C a
-underBinder = local \e -> e { boundVars = boundVars e + 1 }
+underBinder :: VarType -> C a -> C a
+underBinder v = local \e -> e
+  { boundVars  = boundVars e + 1
+  , boundTypes = v : boundTypes e
+  }
 
--- | Compilation monad.
+underTypeVar :: C a -> C a
+underTypeVar = local \CompileEnv{..} -> CompileEnv
+  { typeVars   = typeVars + 1
+  , boundVars  = boundVars + 1
+  , boundTypes = TypeVar typeVars : boundTypes
+  }
+
+-- | Type compilation monad.
 type C a = ReaderT CompileEnv CompileM a
 
-
--- TODO(flupe)
-compileTopLevelType :: Type -> CompileM ([LBox.TypeVarInfo], LBox.Type)
-compileTopLevelType typ = do
-  typ' <- compileType 0 typ
-  pure ([], typ')
-
--- | Compile a type, given a number of type variables in scope.
-compileType :: Int -> Type -> CompileM LBox.Type
-compileType tvars = runC tvars . compileTypeC
 
 -- | Compile constructor arguments' types, given a set number of type variables.
 compileArgs :: Int -> [Dom Type] -> CompileM [(LBox.Name, LBox.Type)]
@@ -77,47 +81,108 @@ compileArgs tvars = runC tvars . compileArgsC
   compileArgsC (dom:args) = do
     let name = maybe LBox.Anon (LBox.Named . prettyShow) $ domName dom
     typ <- compileTypeC $ unDom dom
-    ((name, typ):) <$> underBinder (compileArgsC args)
+    -- TODO(flupe): pick the right var type
+    ((name, typ):) <$> underBinder Other (compileArgsC args)
+
+
+-- | Compile a top-level type to λ□, lifting out type variables.
+--
+-- The algorithm is a slight variation over the one presented
+-- in [Extracting functional programs from Coq, in Coq](https://arxiv.org/pdf/2108.02995).
+
+compileTopLevelType :: Type -> CompileM ([LBox.Name], LBox.Type)
+compileTopLevelType = runC 0 . compileTopLevelTypeC
+  where
+  compileTopLevelTypeC :: Type -> C ([LBox.Name], LBox.Type)
+  compileTopLevelTypeC typ =
+    ifM (liftTCM $ isLogical typ) (pure ([], LBox.TBox)) $
+    case unEl typ of
+
+      Pi dom codom -> do
+
+        let domType      = unDom dom
+        let codomType    = absBody codom
+
+        domIsLogical <- liftTCM $ isLogical domType
+        domIsArity   <- liftTCM $ isArity domType
+
+        -- logical types and non-arities can never be lifted to type variables,
+        -- we keep going
+        if domIsLogical || not domIsArity then do
+          domType' <- if domIsLogical then pure LBox.TBox
+                                      else compileTypeC domType
+          (vars, codomType')
+            <- underBinder Other $ compileTopLevelTypeC codomType
+
+          pure (vars, LBox.TArr domType' codomType')
+
+        else do
+          (vars, codomType') <- underTypeVar $ compileTopLevelTypeC codomType
+          let name = maybe LBox.Anon (LBox.Named . prettyShow) $ domName dom
+          pure (name : vars, LBox.TArr LBox.TBox codomType')
+
+      t -> ([],) <$> compileTypeTermC t
+
+
+-- | Compile a type, given a number of type variables in scope.
+compileType :: Int -> Type -> CompileM LBox.Type
+compileType tvars = runC tvars . compileTypeC
+
 
 compileTypeC :: Type -> C LBox.Type
 compileTypeC = compileTypeTermC . unEl
 
+-- Apply a type constructor to a list of types.
+tapp :: LBox.Type -> [LBox.Type] -> LBox.Type
+tapp = foldl' LBox.TApp
+
 compileTypeTermC :: Term -> C LBox.Type
 compileTypeTermC = unSpine >>> \case
-  Var n es -> do
-    CompileEnv{..} <- ask
-    if n < boundVars then
-      pure LBox.TBox -- NOTE(flupe): should we still apply the parameters to the box?
+  Sort{} -> pure LBox.TBox
 
-    -- it's pointing to a type variable
-    else do
-      -- NOTE(flupe):
-      --   type variables are referenced using De Bruijn levels.
-      --   that's how we compute the appropriate level for the type var.
-      let k = typeVars - (n - boundVars) - 1
+  Var n _ -> do
+    (!! n) <$> asks boundTypes >>= \case
+      TypeVar n -> pure $ LBox.TVar n
+      Other     -> pure $ LBox.TAny
 
-      -- NOTE(flupe): 
-      --   type variables are restricted to Hindley-Milner,
-      --   so they cannot be type constructors: we don't compile elims
-      pure $ LBox.TVar k
-
+  -- agda definition applied to some arguments
   Def q es -> do
-    -- TODO(flupe):
-    --   check if it's an inductive, 
-    --   or a type alias
+    def <- liftTCM $ theDef <$> getConstInfo q
 
-    -- TODO(flupe): 
-    --   check if it's a projection:
-    --     if it is: should put box
-    foldl' LBox.TApp (LBox.TConst $ qnameToKName q) <$> compileElims es
-  Pi dom abs ->
-    LBox.TArr <$> compileTypeC (unDom dom)
-              <*> underBinder (compileTypeC (unAbs abs))
+    -- if it's an inductive:
+    if isDataOrRecDef def then
+      -- we only apply the parameters
+      tapp (LBox.TConst $ qnameToKName q)
+        <$> compileElims (take (getInductiveParams def) es)
+
+    -- TODO: check if it is a type alias
+    --   (if it is, do more or less the same thing as above)
+
+    -- else: it's any! (or a box?)
+    else pure LBox.TAny
+
+  Pi dom abs -> do
+    let domType   = unDom dom
+    let codomType = absBody abs
+
+    domIsLogical <- liftTCM $ isLogical domType
+    domIsArity   <- liftTCM $ isArity domType
+
+    -- logical types and non-arities can never be lifted to type variables,
+    -- we keep going
+    domType' <-
+      if | domIsLogical || domIsArity -> pure LBox.TBox
+         | otherwise -> compileTypeTermC $ unEl domType
+
+    codomType'
+      <- underBinder Other $ compileTypeTermC $ unEl $ codomType
+
+    pure $ LBox.TArr domType' codomType'
 
   -- NOTE(flupe):
   --  My current understanding of typed lambox is that the type translation never fails.
-  --  worst case, we cannot generate nice types and fall back on □
-  t       -> pure LBox.TBox
+  --  worst case, we cannot generate nice types and fall back on TAny
+  t -> pure LBox.TAny
 
 compileElims :: Elims -> C [LBox.Type]
 compileElims = mapM \case

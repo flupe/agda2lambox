@@ -1,5 +1,21 @@
 {-# LANGUAGE DataKinds, GADTs, OverloadedStrings #-}
+{- | 
+Module      : LambdaBox.Env
+Description : Lambda Box environments, identical for both targets.
+
+In this module, we define all the building blocks that make up
+a λ□ global environment.
+
+Because we want to target both the untyped and typed-annotated variants
+of λ□, but would rather use a single unified global environment,
+we parametrize most definitions with a typing mode 'Agda2Lambox.Compile.Target.Typing'.
+
+This ensures that the typing information /is always there/ when targetting the 
+typed target, while also avoiding to do unnecessary work when type information is not required.
+-}
 module LambdaBox.Env where
+
+
 
 import Data.Kind ( Type )
 
@@ -35,15 +51,40 @@ data ProjectionBody t = Projection
   , projType :: WhenTyped t LBox.Type
   }
 
+{- | Type variable information.
+
+See [Extracting functional programs from Coq, in Coq](https://arxiv.org/pdf/2108.02995)
+for the full explanation.
+
+* A type is an /arity/ if it is a (possibly nullary) product into a sort.
+
+    So of the shape @∀ (a₁ : A₁) ... (a_n : A_n) → s@ with @s@ being @Type@ or @Prop@.
+
+    Inhabitants of arities are called /type schemes/.
+
+* A type is /logical/ when it is a proposition (i.e. inhabitants are proofs) 
+  or when it is an /arity/ into @Prop@.
+
+    * @P@ when @P : Prop@.
+    * @∀ (a₁ : A₁) ... (a_n : A_n) → Prop@ (i.e. inhabitants are propositional type schemes). 
+
+* A type is a sort when it is either @Prop@ or @Type@.
+
+    Note that a sort is always a /nullary/ arity.
+
+A few examples:
+
+* @Type@ is an arity and a sort, but not logical.
+* @P@ with @P : Prop@ is logical, but neither an arity nor a sort.
+* @Type → Prop@ is logical, an arity, but not a sort.
+* @Type → Type@ is an arity, but neither a sort nor logical.
+* @∀ (A : Type) → A → A@ is neither of the three.
+
+-}
 data TypeVarInfo = TypeVarInfo
   { tvarName      :: Name
-  , tvarIsLogical :: Bool
-     -- ^ A parameter @t@ is *logical* if it is "a proposition when fully applied"
-     --    i.e @t : Prop@ means  t is logical,
-     --        @t a₁ a₂ : Prop@ means t is logical
   , tvarIsArity   :: Bool
-     -- ^ a parameter @t@ is an arity if it is a type when fully applied.
-     --     Consider @(T : Type → Type) (A : T Nat)@. @A@ is an arity, because @T : @
+  , tvarIsLogical :: Bool
   , tvarIsSort    :: Bool
   }
 
@@ -71,7 +112,7 @@ data ConstantBody t = ConstantBody
   }
 
 -- | Global declarations.
-data GlobalDecl :: Typing -> Type where
+data GlobalDecl (t :: Typing) :: Type where
   ConstantDecl  :: ConstantBody t                   -> GlobalDecl t
   InductiveDecl :: MutualInductiveBody t            -> GlobalDecl t
   TypeAliasDecl :: Maybe ([TypeVarInfo], LBox.Type) -> GlobalDecl Typed

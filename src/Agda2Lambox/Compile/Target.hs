@@ -15,13 +15,13 @@ import Data.Kind ( Type )
 -- | Supported targets.
 data Typing = Typed | Untyped
 
--- | Compile targets, indexed by the kind of target.
+-- | Compile targets, indexed by the typing mode.
 data Target :: Typing -> Type where
   ToTyped   :: Target Typed
   ToUntyped :: Target Untyped
 
 -- | Type wrapper that contains a value iff we're in the typed setting.
-data WhenTyped :: Typing -> Type -> Type where
+data WhenTyped (t :: Typing) (a :: Type) :: Type where
   None ::      WhenTyped Untyped a
   Some :: a -> WhenTyped Typed   a
 

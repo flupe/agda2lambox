@@ -23,10 +23,10 @@ import Agda.TypeChecking.Substitute (TelView, TelV(theTel), apply)
 import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock, reportSDoc, AddContext (addContext), constructorForm)
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Common (Arg)
-import Agda.Syntax.Internal ( ConHead(..), unDom, Term)
+import Agda.Syntax.Internal ( ConHead(..), unDom, Term, Dom' (domName), isSort, Type'' (unEl))
 import Agda.Utils.Monad ( unlessM )
 
-import Agda.Utils ( isDataOrRecDef )
+import Agda.Utils ( isDataOrRecDef, isLogical, isArity )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
@@ -89,13 +89,17 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
 
     let pvars :: [Arg Term] = teleArgs params
 
-    -- TODO(flupe)
-    tyvars <- whenTyped t $ forM pvars \_ ->
+    -- TODO(flupe): bind params iteratively to correctly figure out the type info
+    tyvars <- whenTyped t $ forM (toList params) \pdom -> do
+      let domType = unDom pdom
+      isParamLogical <- liftTCM $ isLogical domType
+      isParamArity   <- liftTCM $ isArity domType
+      let isParamSort = isJust $ isSort $ unEl $ domType
       pure LBox.TypeVarInfo
-              { tvarName      = LBox.Anon
-              , tvarIsLogical = False
-              , tvarIsArity   = False
-              , tvarIsSort    = False
+        { tvarName      = maybe LBox.Anon (LBox.Named . prettyShow) $ domName pdom
+              , tvarIsLogical = isParamLogical
+              , tvarIsArity   = isParamArity
+              , tvarIsSort    = isParamSort
               }
 
     ctors :: [LBox.ConstructorBody t] <-
@@ -131,8 +135,18 @@ actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
       "Record parameters:" <+> prettyTCM params
     let pvars :: [Arg Term] = teleArgs params
 
-    -- TODO
-    tyvars  <- whenTyped t $ pure []
+    -- TODO(same as for datatypes)
+    tyvars <- whenTyped t $ forM (toList params) \pdom -> do
+      let domType = unDom pdom
+      isParamLogical <- liftTCM $ isLogical domType
+      isParamArity   <- liftTCM $ isArity domType
+      let isParamSort = isJust $ isSort $ unEl $ domType
+      pure LBox.TypeVarInfo
+        { tvarName      = maybe LBox.Anon (LBox.Named . prettyShow) $ domName pdom
+              , tvarIsLogical = isParamLogical
+              , tvarIsArity   = isParamArity
+              , tvarIsSort    = isParamSort
+              }
 
     conTypeInfo <- whenTyped t $
       let conTel  = toList $ recTel `apply` pvars

@@ -5,7 +5,7 @@ module Agda2Lambox.Compile.Term
 
 import Control.Monad.Fail ( MonadFail )
 import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.Reader.Class ( MonadReader, ask )
+import Control.Monad.Reader.Class ( MonadReader, ask, asks )
 import Control.Monad.Reader ( ReaderT(runReaderT), local )
 import Control.Monad.Trans
 import Data.List ( elemIndex, foldl', singleton )
@@ -83,7 +83,12 @@ compileTerm ms = runC . withMutuals ms . compileTermC
 -- | Convert a treeless term to its λ□ equivalent.
 compileTermC :: TTerm -> C LBox.Term
 compileTermC = \case
-  TVar  n -> pure $ LRel n
+
+  TVar  n -> do
+    bound <- asks boundVars
+    if n < bound then pure $ LRel n
+                 else pure $ LBox -- a type variable
+
   TPrim p -> genericError "primitives not supported"
 
   -- NOTE(flupe):

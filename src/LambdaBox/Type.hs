@@ -19,7 +19,7 @@ data Type
 instance Pretty Type where
   prettyPrec p = \case
     TBox         -> "□"
-    TAny         -> "*"
+    TAny         -> "𝕋"
     TArr s t     -> mparens (p > 0) $ prettyPrec 1 s <+> "→" <+> pretty t
     TApp s t     -> mparens (p > 9) $ pretty s <+> prettyPrec 10 t
     TVar n       -> "@" <> pretty n
