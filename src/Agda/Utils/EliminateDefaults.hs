@@ -1,5 +1,15 @@
--- NOTE(flupe): Taken straight from Agda source.
---              The difference is that we also add branches for unreachable defaults.
+{-
+NOTE(flupe):
+Taken straight from Agda source.
+There are two important differences:
+- we also add branches for unreachable defaults (because we need all cases to be exhaustive)
+- we sort the case alts according to the order of constructors for the given inductive
+
+Currently, the default branch value is bound in a let binding,
+I don't know if this will be problematic for some targets that evaluate
+the binding before the case. Will they fail?
+
+-}
 
 -- | Eliminates case defaults by adding an alternative for all possible
 -- constructors. Literal cases are preserved as-is.
@@ -9,12 +19,10 @@ import Control.Monad
 import qualified Data.List as List
 
 import Agda.Syntax.Treeless
-
 import Agda.TypeChecking.Monad
 import Agda.TypeChecking.Substitute
-
 import Agda.Compiler.Treeless.Subst () --instance only
-import Control.Monad.IO.Class (MonadIO(liftIO))
+
 
 eliminateCaseDefaults :: TTerm -> TCM TTerm
 eliminateCaseDefaults = tr
@@ -32,12 +40,12 @@ eliminateCaseDefaults = tr
 
         alts' <- (++ newAlts) <$> mapM (trAlt . raise 1) alts
 
-        -- NOTE(flupe):
-        --   alts have to respect the order of constructors
+        -- sort the alts
         let alts'' = flip List.sortOn alts' \alt -> List.elemIndex (aCon alt) dtCons 
 
         return $ TLet def $ TCase (sc + 1) ct tUnreachable alts''
 
+      -- case on non-data are always exhaustive
       TCase sc ct def alts -> TCase sc ct <$> tr def <*> mapM trAlt alts
 
       t@TVar{}    -> return t
@@ -50,10 +58,10 @@ eliminateCaseDefaults = tr
       t@TErased{} -> return t
       t@TError{}  -> return t
 
-      TCoerce a               -> TCoerce <$> tr a
-      TLam b                  -> TLam <$> tr b
-      TApp a bs               -> TApp <$> tr a <*> mapM tr bs
-      TLet e b                -> TLet <$> tr e <*> tr b
+      TCoerce a -> TCoerce <$> tr a
+      TLam b    -> TLam <$> tr b
+      TApp a bs -> TApp <$> tr a <*> mapM tr bs
+      TLet e b  -> TLet <$> tr e <*> tr b
 
     trAlt :: TAlt -> TCM TAlt
     trAlt = \case

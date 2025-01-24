@@ -20,7 +20,7 @@ import Agda.Syntax.Common ( hasQuantityω )
 import Agda.Utils.Monad (guardWithError, whenM)
 import Agda.Utils.Lens ( (^.) )
 
-import Agda.Utils ( etaExpandCtor, treeless, pp, isRecordProjection )
+import Agda.Utils ( treeless, pp, isRecordProjection )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
@@ -44,10 +44,10 @@ compileFunctionBody :: [QName] -> Definition -> CompileM LBox.Term
 compileFunctionBody ms Defn{defName, theDef} = do
   Just t <- liftTCM $ treeless defName
 
-  reportSDoc "agda2lambox.ocmpile.function" 10 $
+  reportSDoc "agda2lambox.compile.function" 10 $
     "treeless body:" <+> pretty t
-    
-  compileTerm ms =<< liftTCM (etaExpandCtor t)
+
+  compileTerm ms t
 
 
 -- | Whether to compile a function definition to λ□.

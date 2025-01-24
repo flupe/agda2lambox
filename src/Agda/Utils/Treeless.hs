@@ -43,7 +43,6 @@ import Agda.Compiler.Treeless.Identity
 import Agda.Compiler.Treeless.Simplify
 import Agda.Compiler.Treeless.Uncase
 import Agda.Compiler.Treeless.Unused
-import Agda.Utils.EliminateDefaults
 
 import Agda.Utils.Function
 import Agda.Utils.Functor
@@ -56,6 +55,9 @@ import qualified Agda.Syntax.Common.Pretty as P
 import qualified Agda.Utils.SmallSet as SmallSet
 
 import Agda.Utils.Impossible
+
+import Agda.Utils.EliminateDefaults
+import Agda.Utils.EtaExpandConstructors
 
 prettyPure :: P.Pretty a => a -> TCM Doc
 prettyPure = return . P.pretty
@@ -185,7 +187,11 @@ compilerPipeline v q =
       , compilerPass "uncase" (30 + v) "uncase"             $ const caseToSeq
       , compilerPass "aspat"  (30 + v) "@-pattern recovery" $ const recoverAsPatterns
       ]
+
     , compilerPass "id" (30 + v) "identity function detection" $ const (detectIdentityFunctions q)
+
+    -- NOTE(flupe): those are custom transformations required by the backend
+    , compilerPass "ctors"    (30 + v) "eta-expand constructors" $ const etaExpandConstructors
     , compilerPass "defaults" (30 + v) "remove default branches" $ const eliminateCaseDefaults
     ]
 
