@@ -6,6 +6,7 @@ module Agda2Lambox.Compile.Inductive
 
 import Control.Monad.Reader ( ask, liftIO )
 import Control.Monad ( forM, when, unless, (>=>) )
+import Data.Functor ((<&>))
 import Data.Foldable ( toList )
 import Data.List ( elemIndex )
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -13,7 +14,7 @@ import Data.List.NonEmpty qualified as NEL
 import Data.Maybe ( isJust, listToMaybe, fromMaybe )
 import Data.Traversable ( mapM )
 
-import Agda.Syntax.Abstract.Name ( qnameModule, qnameName )
+import Agda.Syntax.Abstract.Name ( QName, qnameModule, qnameName )
 import Agda.TypeChecking.Monad.Base hiding (None)
 import Agda.TypeChecking.Monad.Env ( withCurrentModule )
 import Agda.TypeChecking.Datatypes ( ConstructorInfo(..), getConstructorInfo, isDatatype )
@@ -23,7 +24,7 @@ import Agda.TypeChecking.Substitute (TelView, TelV(theTel), apply)
 import Agda.Compiler.Backend ( getConstInfo, lookupMutualBlock, reportSDoc, AddContext (addContext), constructorForm)
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Common (Arg)
-import Agda.Syntax.Internal ( ConHead(..), unDom, Term, Dom' (domName), isSort, Type'' (unEl))
+import Agda.Syntax.Internal
 import Agda.Utils.Monad ( unlessM )
 
 import Agda.Utils ( isDataOrRecDef, isLogical, isArity )
@@ -78,92 +79,78 @@ compileInductive t defn@Defn{defName} = do
       }
 
 
+data InductiveBundle = Bundle
+  { indName :: QName
+  , indType :: Type
+  , indCons :: [QName]
+  , indPars :: Int
+  }
+
+getBundle :: Definition -> InductiveBundle
+getBundle defn@Defn{defName, defType, theDef} =
+  case theDef of
+    Datatype{dataPars, dataCons} ->
+      Bundle 
+        { indName = defName
+        , indType = defType
+        , indCons = dataCons
+        , indPars = dataPars
+        }
+    Record{recPars} ->
+      Bundle
+        { indName = defName
+        , indType = defType
+        , indCons = [recCon theDef]
+        , indPars = recPars
+        }
+
 -- TODO(flupe):
 --  actually really unify the compilation of both, they do exactly the same thing
 actuallyConvertInductive :: forall t. Target t -> Definition -> CompileM (LBox.OneInductiveBody t)
-actuallyConvertInductive t defn@Defn{defName, theDef} = case theDef of
-  Datatype{..} -> do
-    params <- theTel <$> telViewUpTo dataPars (defType defn)
-    reportSDoc "agda2lambox.compile.inductive" 10 $
-      "Datatype parameters:" <+> prettyTCM params
+actuallyConvertInductive t defn = do
+  let Bundle{..} = getBundle defn
 
-    let pvars :: [Arg Term] = teleArgs params
+  params <- theTel <$> telViewUpTo indPars indType
+  reportSDoc "agda2lambox.compile.inductive" 10 $
+    "Inductive parameters:" <+> prettyTCM params
 
-    -- TODO(flupe): bind params iteratively to correctly figure out the type info
-    tyvars <- whenTyped t $ forM (toList params) \pdom -> do
-      let domType = unDom pdom
-      isParamLogical <- liftTCM $ isLogical domType
-      isParamArity   <- liftTCM $ isArity domType
-      let isParamSort = isJust $ isSort $ unEl $ domType
-      pure LBox.TypeVarInfo
-        { tvarName      = maybe LBox.Anon (LBox.Named . prettyShow) $ domName pdom
-              , tvarIsLogical = isParamLogical
-              , tvarIsArity   = isParamArity
-              , tvarIsSort    = isParamSort
-              }
+  let pvars :: [Arg Term] = teleArgs params
 
-    ctors :: [LBox.ConstructorBody t] <-
-      forM dataCons \cname -> do
-        DataCon arity <- liftTCM $ getConstructorInfo cname
+  -- TODO(flupe): bind params iteratively to correctly figure out the type info
+  tyvars <- whenTyped t $ forM (toList params) \pdom -> do
+    let domType = unDom pdom
+    isParamLogical <- liftTCM $ isLogical domType
+    isParamArity   <- liftTCM $ isArity domType
+    let isParamSort = isJust $ isSort $ unEl $ domType
+    pure LBox.TypeVarInfo
+      { tvarName      = maybe LBox.Anon (LBox.Named . prettyShow) $ domName pdom
+            , tvarIsLogical = isParamLogical
+            , tvarIsArity   = isParamArity
+            , tvarIsSort    = isParamSort
+            }
 
-        conTypeInfo <- whenTyped t do
-          conType <- liftTCM $ (`piApplyM` pvars) =<< defType <$> getConstInfo cname
-          conTel  <- toList . theTel <$> telView conType
-          compileArgs dataPars conTel
+  ctors :: [LBox.ConstructorBody t] <-
+    forM indCons \cname -> do
+      arity <- liftTCM $ getConstructorInfo cname <&> \case
+        DataCon arity         -> arity
+        RecordCon _ _ arity _ -> arity
 
-        pure LBox.Constructor
-          { cstrName  = prettyShow $ qnameName cname
-          , cstrArgs  = arity
-          , cstrTypes = conTypeInfo
-          }
+      conTypeInfo <- whenTyped t do
+        conType <- liftTCM $ (`piApplyM` pvars) =<< defType <$> getConstInfo cname
+        conTel  <- toList . theTel <$> telView conType
+        compileArgs indPars conTel
 
-    pure LBox.OneInductive
-      { indName          = prettyShow $ qnameName defName
-      , indPropositional = False        -- TODO(flupe)
-      , indKElim         = LBox.IntoAny -- TODO(flupe)
-      , indCtors         = ctors
-      , indProjs         = []
-      , indTypeVars      = tyvars
-      }
+      pure LBox.Constructor
+        { cstrName  = prettyShow $ qnameName cname
+        , cstrArgs  = arity
+        , cstrTypes = conTypeInfo
+        }
 
-  Record{..} -> do
-
-    let ConHead{conName, conFields} = recConHead
-
-    params <- theTel <$> telViewUpTo recPars (defType defn)
-    reportSDoc "agda2lambox.compile.inductive" 10 $
-      "Record parameters:" <+> prettyTCM params
-    let pvars :: [Arg Term] = teleArgs params
-
-    -- TODO(same as for datatypes)
-    tyvars <- whenTyped t $ forM (toList params) \pdom -> do
-      let domType = unDom pdom
-      isParamLogical <- liftTCM $ isLogical domType
-      isParamArity   <- liftTCM $ isArity domType
-      let isParamSort = isJust $ isSort $ unEl $ domType
-      pure LBox.TypeVarInfo
-        { tvarName      = maybe LBox.Anon (LBox.Named . prettyShow) $ domName pdom
-              , tvarIsLogical = isParamLogical
-              , tvarIsArity   = isParamArity
-              , tvarIsSort    = isParamSort
-              }
-
-    conTypeInfo <- whenTyped t $
-      let conTel  = toList $ recTel `apply` pvars
-      in compileArgs recPars conTel
-
-    pure LBox.OneInductive
-      { indName          = prettyShow $ qnameName defName
-      , indPropositional = False        -- TODO(flupe)
-      , indKElim         = LBox.IntoAny -- TODO(flupe)
-      , indCtors         =
-          [ LBox.Constructor
-              (prettyShow $ qnameName conName)
-              (length conFields)
-              conTypeInfo
-          ]
-      , indProjs         = []
-      , indTypeVars      = tyvars
-      }
-
-  -- { indFinite = maybe LBox.BiFinite inductionToRecKind recInduction
+  pure LBox.OneInductive
+    { indName          = prettyShow $ qnameName indName
+    , indPropositional = False        -- TODO(flupe)
+    , indKElim         = LBox.IntoAny -- TODO(flupe)
+    , indCtors         = ctors
+    , indProjs         = []
+    , indTypeVars      = tyvars
+    }

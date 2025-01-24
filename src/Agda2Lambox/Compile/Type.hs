@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, FlexibleInstances, MultiWayIf #-}
+{-# LANGUAGE LambdaCase, FlexibleInstances, MultiWayIf, NamedFieldPuns #-}
 module Agda2Lambox.Compile.Type
   ( compileType
   , compileTopLevelType
@@ -17,14 +17,14 @@ import Data.Maybe ( isJust )
 
 import Agda.Syntax.Common ( unArg )
 import Agda.Syntax.Internal
-import Agda.TypeChecking.Monad.Base ( TCM, MonadTCM (liftTCM), Definition (theDef) )
+import Agda.TypeChecking.Monad.Base ( TCM, MonadTCM (liftTCM), Definition(..))
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Utils.Monad (ifM)
 
 import qualified LambdaBox as LBox
 import Agda2Lambox.Compile.Utils ( qnameToKName )
 import Agda2Lambox.Compile.Monad
-import Agda.Compiler.Backend (HasConstInfo(getConstInfo))
+import Agda.Compiler.Backend (HasConstInfo(getConstInfo), Definition(Defn))
 import Agda.Utils (isDataOrRecDef, getInductiveParams, isLogical, isArity)
 import Agda.TypeChecking.Substitute (absBody, TelV (theCore))
 import Agda.TypeChecking.Telescope (telView)
@@ -130,7 +130,10 @@ compileType tvars = runC tvars . compileTypeC
 
 
 compileTypeC :: Type -> C LBox.Type
-compileTypeC = compileTypeTermC . unEl
+compileTypeC typ =
+  ifM (liftTCM $ isLogical typ)
+    (pure LBox.TBox)
+    (compileTypeTermC $ unEl typ)
 
 -- Apply a type constructor to a list of types.
 tapp :: LBox.Type -> [LBox.Type] -> LBox.Type
@@ -141,16 +144,22 @@ compileTypeTermC = unSpine >>> \case
   Sort{} -> pure LBox.TBox
 
   Var n _ -> do
+    -- TODO: I think we should distinguish b/w "other" and logical variables
     (!! n) <$> asks boundTypes >>= \case
       TypeVar n -> pure $ LBox.TVar n
       Other     -> pure $ LBox.TAny
 
   -- agda definition applied to some arguments
   Def q es -> do
-    def <- liftTCM $ theDef <$> getConstInfo q
+    Defn{theDef = def, defType}
+      <- liftTCM $ getConstInfo q
+
+    isLogicalDef <- liftTCM $ isLogical defType
+
+    if isLogicalDef then pure LBox.TBox
 
     -- if it's an inductive:
-    if isDataOrRecDef def then
+    else if isDataOrRecDef def then
       -- we only apply the parameters
       tapp (LBox.TConst $ qnameToKName q)
         <$> compileElims (take (getInductiveParams def) es)
@@ -172,10 +181,10 @@ compileTypeTermC = unSpine >>> \case
     -- we keep going
     domType' <-
       if | domIsLogical || domIsArity -> pure LBox.TBox
-         | otherwise -> compileTypeTermC $ unEl domType
+         | otherwise -> compileTypeC domType
 
     codomType'
-      <- underBinder Other $ compileTypeTermC $ unEl $ codomType
+      <- underBinder Other $ compileTypeC $ codomType
 
     pure $ LBox.TArr domType' codomType'
 

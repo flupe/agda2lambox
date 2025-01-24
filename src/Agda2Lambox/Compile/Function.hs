@@ -9,11 +9,13 @@ import Control.Monad.IO.Class ( liftIO )
 import Data.List ( elemIndex )
 import Data.Maybe ( isNothing, fromMaybe )
 
+import Data.Foldable (toList)
 import Agda.Syntax.Abstract.Name ( QName, qnameModule )
 import Agda.TypeChecking.Monad.Base hiding ( None )
 import Agda.TypeChecking.Pretty
 import Agda.Compiler.ToTreeless ( toTreeless )
 import Agda.Compiler.Backend ( getConstInfo, funInline, reportSDoc )
+import Agda.Syntax.Internal (domName)
 import Agda.Syntax.Treeless ( EvaluationStrategy(EagerEvaluation) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Common ( hasQuantityω )
@@ -30,7 +32,7 @@ import Agda2Lambox.Compile.Type ( compileTopLevelType, compileType )
 import LambdaBox qualified as LBox
 import LambdaBox.Env
 import Agda.TypeChecking.Telescope (telViewUpTo)
-import Agda.TypeChecking.Substitute (TelV(theCore))
+import Agda.TypeChecking.Substitute (TelV(theCore, theTel))
 
 
 -- | Check whether a definition is a function.
@@ -80,9 +82,11 @@ compileFunction (t :: Target t) defn@Defn{defType} = do
     -- if it is a (real) projection, drop the parameters from the type
     Just (recName, _) -> do
       Record{recPars} <- fmap theDef $ liftTCM $ getConstInfo recName
+      projTel <- telViewUpTo recPars defType
       projType <- theCore <$> telViewUpTo recPars defType
-      -- TODO(flupe): retrieve the name of type variable
-      (take recPars $ repeat LBox.Anon,) <$> compileType recPars projType
+      let names  = map domName $ toList $ theTel projTel
+          pnames = map (maybe LBox.Anon (LBox.Named . prettyShow)) names
+      (pnames,) <$> compileType recPars projType
 
     -- TODO(flupe): ^ take care of projection-like functions
     --                they should be eta-expanded somehow,
