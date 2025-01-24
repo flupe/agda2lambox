@@ -137,8 +137,8 @@ compileTermC = \case
   TSort   -> return LBox
   TErased -> return LBox
 
+  TError terr -> return LBox -- unreachable clause
   TCoerce tt  -> genericError "Coerces not supported."
-  TError terr -> genericError "Errors not supported."
 
 compileLit :: Literal -> C LBox.Term
 compileLit = \case

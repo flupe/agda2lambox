@@ -16,15 +16,17 @@ import Agda.TypeChecking.Substitute ( raise, TelV (theCore) )
 import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Treeless
 
-import Agda.Compiler.ToTreeless          qualified as TT
-import Agda.Compiler.Treeless.Builtin    qualified as TT
-import Agda.Compiler.Treeless.Erase      qualified as TT
-import Agda.Compiler.Treeless.Simplify   qualified as TT
-import Agda.Compiler.Treeless.Identity   qualified as TT
-import Agda.Compiler.Treeless.Uncase     qualified as TT
-import Agda.Compiler.Treeless.AsPatterns qualified as TT
+import Agda.Compiler.ToTreeless                 qualified as TT
+import Agda.Compiler.Treeless.Builtin           qualified as TT
+import Agda.Compiler.Treeless.Erase             qualified as TT
+import Agda.Compiler.Treeless.Simplify          qualified as TT
+import Agda.Compiler.Treeless.Identity          qualified as TT
+import Agda.Compiler.Treeless.Uncase            qualified as TT
+import Agda.Compiler.Treeless.AsPatterns        qualified as TT
 import Agda.TypeChecking.Telescope (telView)
 
+import Agda.Utils.EliminateDefaults qualified as TT
+import Agda.Utils.Treeless qualified as CustomTT
 
 -- * Miscellaneous
 
@@ -79,23 +81,27 @@ isArity typ = do
 
 -- | Convert compiled clauses to treeless syntax, and return it.
 treeless :: QName -> TCM (Maybe TTerm)
-treeless = TT.toTreelessWith compilerPipeline (EagerEvaluation, TT.EraseUnused)
+treeless = CustomTT.toTreeless EagerEvaluation
+  -- TT.toTreelessWith pipeline (EagerEvaluation, TT.EraseUnused)
+  {-
   where
-  compilerPipeline v q =
+    pipeline v q = TT.Sequential []
     TT.Sequential
       -- NOTE (flupe): this is the default Agda treeless pipeline
       --               with the builtin pass removed.
-      -- TODO(flupe):
-      --   we most likely want the eliminateCaseDefaults transformation to have exhaustive matches
       -- [ TT.compilerPass "builtin" (30 + v) "builtin translation" $ const TT.translateBuiltins
       [ TT.FixedPoint 5 $ TT.Sequential
-        [ TT.compilerPass "simpl"  (30 + v) "simplification"     $ const TT.simplifyTTerm
-        , TT.compilerPass "erase"  (30 + v) "erasure"            $ TT.eraseTerms q
-        , TT.compilerPass "uncase" (30 + v) "uncase"             $ const TT.caseToSeq
-        , TT.compilerPass "aspat"  (30 + v) "@-pattern recovery" $ const TT.recoverAsPatterns
+        [ -- TT.compilerPass "simpl"  (30 + v) "simplification"     $ const TT.simplifyTTerm
+        -- TT.compilerPass "erase"  (30 + v) "erasure"            $ TT.eraseTerms q
+        -- , TT.compilerPass "uncase" (30 + v) "uncase"             $ const TT.caseToSeq
+        -- , TT.compilerPass "aspat"  (30 + v) "@-pattern recovery" $ const TT.recoverAsPatterns
         ]
-      , TT.compilerPass "id" (30 + v) "identity function detection" $ const (TT.detectIdentityFunctions q)
+      -- , TT.compilerPass "id" (30 + v) "identity function detection" $ const (TT.detectIdentityFunctions q)
+
+      -- NOTE(flupe): actually, we also remove case defaults to add a branch for all constructors
+      -- , TT.compilerPass "defaults" (30 + v) "eliminate case defaults" $ const TT.eliminateCaseDefaults
       ]
+      -}
 
 -- ** eta-expansion of constructors
 

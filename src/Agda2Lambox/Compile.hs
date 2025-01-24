@@ -37,6 +37,7 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
   reportSDoc "agda2lambox.compile" 1 $ "Compiling definition: " <+> prettyTCM defName
   fmap (qnameToKerName defName,) <$> -- prepend kername
     case theDef of
+      GeneralizableVar{} -> pure Nothing
 
       Axiom{} -> do
         typ <- whenTyped target $ compileTopLevelType defType

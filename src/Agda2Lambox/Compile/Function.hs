@@ -13,10 +13,8 @@ import Data.Foldable (toList)
 import Agda.Syntax.Abstract.Name ( QName, qnameModule )
 import Agda.TypeChecking.Monad.Base hiding ( None )
 import Agda.TypeChecking.Pretty
-import Agda.Compiler.ToTreeless ( toTreeless )
 import Agda.Compiler.Backend ( getConstInfo, funInline, reportSDoc )
 import Agda.Syntax.Internal (domName)
-import Agda.Syntax.Treeless ( EvaluationStrategy(EagerEvaluation) )
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.Syntax.Common ( hasQuantityω )
 import Agda.Utils.Monad (guardWithError, whenM)
@@ -45,6 +43,10 @@ isFunction _ = False
 compileFunctionBody :: [QName] -> Definition -> CompileM LBox.Term
 compileFunctionBody ms Defn{defName, theDef} = do
   Just t <- liftTCM $ treeless defName
+
+  reportSDoc "agda2lambox.ocmpile.function" 10 $
+    "treeless body:" <+> pretty t
+    
   compileTerm ms =<< liftTCM (etaExpandCtor t)
 
 

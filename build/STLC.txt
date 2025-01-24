@@ -1,0 +1,108 @@
+Nat:
+  mutual inductive(s):
+    Nat
+      constructors:
+        zero (0 arg(s))
+        suc (1 arg(s))
+
+add:
+  constant declaration:
+    body: μ rec ->
+            λ _ _ →
+              let _ = □
+              in case<Nat{0},0> @2 of
+                   λ<[]> @1
+                   λ<[_]> Nat{0}{1} (@4 @0 @2)
+
+Type:
+  mutual inductive(s):
+    Type
+      constructors:
+        ℕ (0 arg(s))
+        _⇒_ (2 arg(s))
+
+Ctx:
+  mutual inductive(s):
+    Ctx
+      constructors:
+        [] (0 arg(s))
+        _▷_ (3 arg(s))
+
+_∋_:
+  mutual inductive(s):
+    _∋_
+      constructors:
+        here (3 arg(s))
+        there (5 arg(s))
+
+Tm:
+  mutual inductive(s):
+    Tm
+      constructors:
+        var (2 arg(s))
+        lam (3 arg(s))
+        app (4 arg(s))
+        lit (1 arg(s))
+        _`+_ (2 arg(s))
+
+⟦_⟧: constant declaration: body: μ rec -> □
+
+Env:
+  mutual inductive(s):
+    Env
+      constructors:
+        [] (0 arg(s))
+        _▷_ (5 arg(s))
+
+lookupEnv:
+  constant declaration:
+    body: μ rec ->
+            λ _ _ _ _ _ →
+              let _ = □
+              in case<Env{0},0> @2 of
+                   λ<[]> @0
+                   λ<[_, _, _, _, _]>
+                     let _ = □
+                     in case<Nat{0},0> @11 of
+                          λ<[]> @0
+                          λ<[_]>
+                            let _ = □
+                            in case<Ctx{0},0> @12 of
+                                 λ<[]> @0
+                                 λ<[_, _, _]>
+                                   let _ = □
+                                   in case<_∋_{0},0> @13 of
+                                        λ<[_, _, _]> @10
+                                        λ<[_, _, _, _, _]> @23 @10 @7 □ @13 @0
+
+eval:
+  constant declaration:
+    body: μ rec ->
+            λ _ _ _ _ _ →
+              let _ = □
+              in case<Tm{0},0> @1 of
+                   λ<[_, _]> lookupEnv @7 @6 □ @4 @0
+                   λ<[_, _, _]>
+                     let _ = □
+                     in case<Type{0},0> @7 of
+                          λ<[]> @0
+                          λ<[_, _]>
+                            λ _ →
+                              @13 Nat{0}{1} @12 Ctx{0}{1} □ @11 @2 @1 Env{0}{1} □ □ □ @9 @0 @4
+                   λ<[_, _, _, _]>
+                     @10 @9 @8 Type{0}{1} @3 @7 @6 @1 (@10 @9 @8 @3 @6 @0)
+                   λ<[_]> @0
+                   λ<[_, _]>
+                     add (@8 @7 @6 Type{0}{0} @4 @1) (@8 @7 @6 Type{0}{0} @4 @0)
+
+test:
+  constant declaration:
+    body: eval Nat{0}{0} Ctx{0}{0} Type{0}{0} Env{0}{0}
+            Tm{0}{2}
+              Type{0}{0}
+              □
+              Tm{0}{1}
+                □
+                □
+                Tm{0}{4} Tm{0}{3} Nat{0}{1} Nat{0}{0} Tm{0}{0} □ _∋_{0}{0} □ □ □
+              Tm{0}{3} Nat{0}{1} Nat{0}{0}

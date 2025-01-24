@@ -16,6 +16,8 @@ executable agda2lambox
   hs-source-dirs:      src
   main-is:             Main.hs
   other-modules:       Agda.Utils,
+                       Agda.Utils.Treeless,
+                       Agda.Utils.EliminateDefaults,
                        Agda2Lambox.Compile.Target,
                        Agda2Lambox.Compile.Utils,
                        Agda2Lambox.Compile.Monad,
