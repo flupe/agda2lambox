@@ -20,23 +20,22 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
 
 ## Status
 
-- Compilation to untyped λ□ programs:
+- Most standard Agda features are supported:
   - Mutually-defined datatypes and record types.
   - Mutually-defined functions.
   - Importing modules.
     The backend transitively compiles all required definitions, and only those.
-  - Nat literals.
+  - Nat literals. Note: currently literal nat patterns are restricted to `0`.
+    You cannot match on `5`, for now.
 
-- Compilation to typed λ□ programs:
-  - Compile function types.
-  - [ ] Type of constructors.
-  - [ ] Type of projections.
-  - [ ] Type aliases.
-  - [ ] CertiCoq/MetaCoq type-checker on generated environments?
+- Typed λ□ environments can be generated with the `--typed` flag.
+  - Inductive and record types get as many type variables as they have parameters.
+  - constants also get some of their type arguments lifted to type variables,
+    when possible.
 
 ## TODO
 
-- [ ] Better error-reporting
+- [ ] Type aliases.
 - [ ] Check support for Agda-specific edge cases
   - [x] Pattern-matching lambdas
   - [x] With-generated lambdas
@@ -44,7 +43,6 @@ cabal run agda2lambox -- --out-dir build -itest test/Nat.agda
   - [ ] Projection-like
   - [ ] Check that treeless generates exhaustive cases
 - [ ] Support primitives (ints and floats)
-
 - [ ] Setup compilation to Wasm/Rust using Certicoq
 - [ ] Setup proper testing infrastructure
 
