@@ -82,28 +82,6 @@ isArity typ = do
 -- | Convert compiled clauses to treeless syntax, and return it.
 treeless :: QName -> TCM (Maybe TTerm)
 treeless = CustomTT.toTreeless EagerEvaluation
-  -- TT.toTreelessWith pipeline (EagerEvaluation, TT.EraseUnused)
-  {-
-  where
-    pipeline v q = TT.Sequential []
-    TT.Sequential
-      -- NOTE (flupe): this is the default Agda treeless pipeline
-      --               with the builtin pass removed.
-      -- [ TT.compilerPass "builtin" (30 + v) "builtin translation" $ const TT.translateBuiltins
-      [ TT.FixedPoint 5 $ TT.Sequential
-        [ -- TT.compilerPass "simpl"  (30 + v) "simplification"     $ const TT.simplifyTTerm
-        -- TT.compilerPass "erase"  (30 + v) "erasure"            $ TT.eraseTerms q
-        -- , TT.compilerPass "uncase" (30 + v) "uncase"             $ const TT.caseToSeq
-        -- , TT.compilerPass "aspat"  (30 + v) "@-pattern recovery" $ const TT.recoverAsPatterns
-        ]
-      -- , TT.compilerPass "id" (30 + v) "identity function detection" $ const (TT.detectIdentityFunctions q)
-
-      -- NOTE(flupe): actually, we also remove case defaults to add a branch for all constructors
-      -- , TT.compilerPass "defaults" (30 + v) "eliminate case defaults" $ const TT.eliminateCaseDefaults
-      ]
-      -}
-
-
   
 -- * projections
 

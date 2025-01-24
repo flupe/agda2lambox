@@ -1,4 +1,12 @@
 {-# LANGUAGE NamedFieldPuns, OverloadedStrings #-}
+{- NOTE(flupe):
+
+Currently we inline the treeless pipeline from the Agda source.
+The reason is simple: there is a bug in the pipeline that makes
+the compiler ignore the user-provided pipeline in recursive calls to treeless.
+Since the treeless compilation is cached (?), it is never recomputed with the right pipeline.
+
+-}
 module Agda.Utils.Treeless
   ( toTreeless
   , toTreelessWith
@@ -174,11 +182,6 @@ compilerPass tag v name code = SinglePass (CompilerPass tag v name code)
 compilerPipeline :: BuildPipeline
 compilerPipeline v q =
   Sequential
-    -- Issue #4967: No simplification step before builtin translation! Simplification relies
-    --              on either all or no builtins being translated. Since we might have inlined
-    --              functions that have had the builtin translation applied, we need to apply it
-    --              first.
-    -- [ compilerPass "simpl"   (35 + v) "simplification"      $ const simplifyTTerm
 
     -- [ compilerPass "builtin" (30 + v) "builtin translation" $ const translateBuiltins
     [ FixedPoint 5 $ Sequential

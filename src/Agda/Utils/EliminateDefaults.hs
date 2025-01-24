@@ -17,6 +17,7 @@ module Agda.Utils.EliminateDefaults where
 
 import Control.Monad
 import qualified Data.List as List
+import Control.Monad.IO.Class (liftIO)
 
 import Agda.Syntax.Treeless
 import Agda.TypeChecking.Monad
@@ -25,7 +26,9 @@ import Agda.Compiler.Treeless.Subst () --instance only
 
 
 eliminateCaseDefaults :: TTerm -> TCM TTerm
-eliminateCaseDefaults = tr
+eliminateCaseDefaults term = do
+  liftIO $ putStrLn "hello"
+  tr term
   where
     tr :: TTerm -> TCM TTerm
     tr = \case

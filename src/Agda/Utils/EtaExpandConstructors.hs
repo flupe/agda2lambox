@@ -36,7 +36,6 @@ etaExpandConstructors t | Just (q, args) <- unSpineCon t = do
     let nlam = arity - nargs
     exargs <- mapM (etaExpandConstructors . raise nlam) args
     let vars = TVar <$> reverse [0 .. nlam - 1]
-    liftIO $ putStrLn $ show vars
     pure $ iterate TLam (TApp (TCon q) $ exargs ++ vars) !! nlam
 
 etaExpandConstructors t = case t of
