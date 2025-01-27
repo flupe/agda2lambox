@@ -16,6 +16,7 @@ import System.Console.GetOpt ( OptDescr(Option), ArgDescr(..) )
 import System.Directory ( createDirectoryIfMissing )
 import System.FilePath ( (</>) )
 import Data.Kind (Type)
+import Data.Text.Lazy.IO qualified as LText
 
 import Paths_agda2lambox ( version )
 
@@ -30,7 +31,8 @@ import Agda.Utils ( pp, hasPragma, isDataOrRecDef )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile       (compile)
-import CoqGen    ( prettyCoq )
+import CoqGen    ( prettyCoq  )
+import SExpr     ( prettySexp )
 import LambdaBox.Env
 
 
@@ -115,10 +117,13 @@ writeModule Options{..} menv IsMain m defs = do
       coqMod   = CoqModule env (map qnameToKName programs)
 
   liftIO do
-    putStrLn $ "Writing " <> fileName ".{v,txt}"
+    putStrLn $ "Writing " <> fileName ".{v,txt,ast}"
 
     pp coqMod <> "\n"
       & writeFile (fileName ".txt")
 
     prettyCoq optTarget coqMod <> "\n"
       & writeFile (fileName ".v")
+
+    prettySexp optTarget coqMod <> "\n"
+      & LText.writeFile (fileName ".ast")
