@@ -36,30 +36,12 @@ coq_makefile -f _CoqProject -o CoqMakefile
 make -f CoqMakefile
 ```
 
-## Status
-
-- Most standard Agda features are supported:
-  - Mutually-defined datatypes and record types.
-  - Mutually-defined functions.
-  - Importing modules.
-    The backend transitively compiles all required definitions, and only those.
-  - Nat literals. Note: currently literal nat patterns are restricted to `0`.
-    You cannot match on `5`, for now.
-
-- Typed λ□ environments can be generated with the `--typed` flag.
-  - Inductive and record types get as many type variables as they have parameters.
-  - constants also get some of their type arguments lifted to type variables,
-    when possible.
-
 ## TODO
 
-- [ ] Type aliases.
+- [ ] Type aliases (See #3)
 - [ ] Check support for Agda-specific edge cases
-  - [x] Pattern-matching lambdas
-  - [x] With-generated lambdas
   - [ ] Module applications
-  - [ ] Projection-like
-  - [ ] Check that treeless generates exhaustive cases
+  - [ ] Projection-like (See #6)
 - [ ] Support primitives (ints and floats)
 - [ ] Setup compilation to Wasm/Rust using Certicoq
 - [ ] Setup proper testing infrastructure
