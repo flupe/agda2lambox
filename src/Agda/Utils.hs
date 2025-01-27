@@ -59,20 +59,8 @@ getInductiveParams Record{recPars}    = recPars
 -- TODO: consider erased things to be logical
 --       so maybe take a Dom Type instead
 
-isLogical, isArity :: Type -> TCM Bool
-
--- | Whether a type is logical.
-isLogical typ = do
-  tel <- telView typ
-  let sort = isSort $ unEl $ theCore $ tel
-  case sort of
-    Just (Univ UProp _) -> pure True
-    Just (Inf  UProp _) -> pure True
-    Just LevelUniv      -> pure True
-    Just SizeUniv       -> pure True
-    _                   -> pure False
-
 -- | Whether a type is an arity.
+isArity :: Type -> TCM Bool
 isArity typ = do
   tel <- telView typ
   pure $ isJust $ isSort $ unEl $ theCore $ tel

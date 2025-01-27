@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, DataKinds, OverloadedStrings #-}
+{-# LANGUAGE NamedFieldPuns, DataKinds, OverloadedStrings, NondecreasingIndentation #-}
 module Agda2Lambox.Compile 
   ( compile
   ) where
@@ -8,10 +8,11 @@ import Data.IORef
 
 import Agda.Compiler.Backend
 import Agda.Syntax.Internal ( QName )
+import Agda.Syntax.Common (Arg(..))
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.TypeChecking.Monad ( liftTCM, getConstInfo )
 import Agda.TypeChecking.Pretty
-import Agda.Utils.Monad ( whenM )
+import Agda.Utils.Monad ( whenM, ifM )
 
 import Agda.Utils ( hasPragma, isDataOrRecDef, treeless )
 
@@ -35,25 +36,29 @@ compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
 compileDefinition :: Target t -> Definition -> CompileM (Maybe (KerName, GlobalDecl t))
 compileDefinition target defn@Defn{..} = setCurrentRange defName do
   reportSDoc "agda2lambox.compile" 1 $ "Compiling definition: " <+> prettyTCM defName
-  fmap (qnameToKerName defName,) <$> -- prepend kername
-    case theDef of
-      GeneralizableVar{} -> pure Nothing
 
-      Axiom{} -> do
-        typ <- whenTyped target $ compileTopLevelType defType
-        pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
+  -- we skip logical definitions altogether
+  ifM (liftTCM $ isLogical $ Arg defArgInfo defType) (pure Nothing) do
 
-      Constructor{conData} -> Nothing <$ requireDef conData
+  -- prepend kername
+  fmap (qnameToKerName defName,) <$> case theDef of
+    GeneralizableVar{} -> pure Nothing
 
-      Function{} -> compileFunction target defn
+    Axiom{} -> do
+      typ <- whenTyped target $ compileTopLevelType defType
+      pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
 
-      d | isDataOrRecDef d -> compileInductive target defn
+    Constructor{conData} -> Nothing <$ requireDef conData
 
-      Primitive{..} -> do
-        reportSDoc "agda2lambox.compile" 5 $
-          "Found primitive: " <> prettyTCM defName <> ". Compiling it as axiom."
+    Function{} -> compileFunction target defn
 
-        typ <- whenTyped target $ compileTopLevelType defType
-        pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
+    d | isDataOrRecDef d -> compileInductive target defn
 
-      _ -> genericError $ "Cannot compile: " <> prettyShow defName
+    Primitive{..} -> do
+      reportSDoc "agda2lambox.compile" 5 $
+        "Found primitive: " <> prettyTCM defName <> ". Compiling it as axiom."
+
+      typ <- whenTyped target $ compileTopLevelType defType
+      pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
+
+    _ -> genericError $ "Cannot compile: " <> prettyShow defName

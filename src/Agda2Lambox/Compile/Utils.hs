@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NamedFieldPuns, FlexibleInstances #-}
 module Agda2Lambox.Compile.Utils
   ( modNameToModPath
   , qnameToKName
@@ -6,19 +6,27 @@ module Agda2Lambox.Compile.Utils
   , dataOrRecMutuals
   , toInductive
   , toConApp
+  , MayBeLogical(isLogical)
   ) where
 
 import Control.Monad.IO.Class ( liftIO )
 import Data.List ( elemIndex )
-import Data.Maybe ( fromMaybe, listToMaybe )
+import Data.Maybe ( fromMaybe, listToMaybe, isJust )
 
+import Agda.Syntax.Internal
 import Agda.Syntax.Abstract.Name
 import Agda.Syntax.Common.Pretty ( prettyShow, Doc )
+import Agda.Syntax.Common ( usableModality, Arg(..) )
 import Agda.TypeChecking.Datatypes ( getConstructors, getConstructorData )
+import Agda.TypeChecking.Level ( isLevelType )
+import Agda.TypeChecking.Monad.SizedTypes ( isSizeType )
 import Agda.TypeChecking.Monad.Base ( TCM )
 import Agda.Compiler.Backend 
 
 import LambdaBox qualified as LBox
+import Agda.TypeChecking.Substitute (TelV(TelV))
+import Agda.TypeChecking.Telescope (telView)
+import Agda.Utils.Monad (orM)
 
 
 -- | Convert and Agda module name to its "equivalent" λ□ module path.
@@ -60,3 +68,49 @@ toConApp qn es = do
   ind  <- toInductive dt
   let idx = fromMaybe 0 $ qn `elemIndex` ctrs
   pure $ LBox.LConstruct ind idx es
+
+
+-- | Class for things that may be considered logical, and thus erased.
+-- See https://arxiv.org/pdf/2108.02995 for the precise definition.
+--
+class MayBeLogical a where
+  isLogical :: a -> TCM Bool
+
+-- * Logical types
+--
+-- Note that we may also want to consider logical products 
+-- into logical types?, Say "proof builders", or "level builders", etc.
+
+-- | Logical types.
+--
+-- A type is considered logical when it is a proposition
+-- (its inhabitants are proofs) or when it is an arity in Prop.
+--
+-- @Size@ and @Level@ are also considered logical.
+instance MayBeLogical Type where
+  isLogical typ = orM
+    [ pure $ isLogicalSort $ getSort typ
+    , isLevelType typ
+    , isJust <$> isSizeType typ
+    , do TelV tel typ <- telView typ
+         case unEl typ of
+           Sort s -> pure $ isLogicalSort s
+           _      -> pure False
+    ]
+    where
+      isLogicalSort :: Sort -> Bool
+      isLogicalSort = \case
+        Prop{}      -> True -- Prop
+        Inf UProp _ -> True -- Propw
+        SizeUniv{}  -> True -- SizeUniv
+        LevelUniv{} -> True -- LevelUniv
+        _           -> False
+
+-- | Additionally, we consider erased domains logical.
+instance MayBeLogical a => MayBeLogical (Dom a) where
+  isLogical dom | not (usableModality dom) = pure True
+  isLogical dom = isLogical $ unDom dom
+
+instance MayBeLogical a => MayBeLogical (Arg a) where
+  isLogical arg | not (usableModality arg) = pure True
+  isLogical arg = isLogical $ unArg arg
