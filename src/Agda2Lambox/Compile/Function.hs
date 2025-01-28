@@ -20,7 +20,7 @@ import Agda.Syntax.Common ( hasQuantityω )
 import Agda.Utils.Monad (guardWithError, whenM)
 import Agda.Utils.Lens ( (^.) )
 
-import Agda.Utils ( treeless, pp, isRecordProjection )
+import Agda.Utils ( treeless, pp, isRecordProjection, isArity )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad

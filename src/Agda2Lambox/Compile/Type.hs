@@ -25,7 +25,7 @@ import qualified LambdaBox as LBox
 import Agda2Lambox.Compile.Utils ( qnameToKName, isLogical )
 import Agda2Lambox.Compile.Monad
 import Agda.Compiler.Backend (HasConstInfo(getConstInfo), Definition(Defn), AddContext (addContext))
-import Agda.Utils (isDataOrRecDef, getInductiveParams, isArity)
+import Agda.Utils (isDataOrRecDef, getInductiveParams, isArity, maybeUnfoldCopy)
 import Agda.TypeChecking.Substitute (absBody, TelV (theCore))
 import Agda.TypeChecking.Telescope (telView)
 
@@ -133,7 +133,7 @@ compileTypeTerm = \case
       TypeVar n -> pure ([], LBox.TVar n)
       Other     -> pure ([], LBox.TAny  )
 
-  Def q es -> do
+  Def q es -> maybeUnfoldCopy q es compileTypeTerm \q es -> do
     Defn{theDef = def, defType, defArgInfo, defName} <- liftTCM $ getConstInfo q
 
     isLogicalDef <- liftTCM $ isLogical $ Arg defArgInfo defType

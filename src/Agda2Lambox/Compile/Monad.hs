@@ -18,7 +18,7 @@ import Queue.Ephemeral ( EphemeralQueue(..) )
 import Queue.Ephemeral qualified as Queue
 
 import Agda.Syntax.Abstract (QName)
-import Agda.Compiler.Backend (getConstInfo)
+import Agda.Compiler.Backend (getConstInfo, PureTCM, HasConstInfo, HasBuiltins)
 import Agda.TypeChecking.Monad (MonadDebug, MonadTrace, MonadAddContext)
 import Agda.TypeChecking.Monad.Debug (MonadDebug, reportSDoc)
 import Agda.TypeChecking.Monad.Base hiding (initState)
@@ -51,7 +51,7 @@ newtype CompileM a = Compile (StateT CompileState TCM a)
   deriving newtype (Functor, Applicative, Monad)
   deriving newtype (MonadIO, MonadFail, MonadDebug, ReadTCState, MonadTrace)
   deriving newtype (MonadError TCErr, MonadTCEnv, MonadTCState, HasOptions, MonadTCM)
-  deriving newtype (MonadAddContext, MonadReduce)
+  deriving newtype (MonadAddContext, MonadReduce, HasConstInfo, HasBuiltins, PureTCM)
 
 -- | Require a definition to be compiled.
 requireDef :: QName -> CompileM ()

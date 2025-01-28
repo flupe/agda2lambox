@@ -7,7 +7,7 @@ import Control.Applicative ( liftA2 )
 import Data.Bifunctor ( second )
 import Data.Maybe ( isJust, isNothing )
 
-import Agda.Compiler.Backend ( getUniqueCompilerPragma )
+import Agda.Compiler.Backend ( getUniqueCompilerPragma, PureTCM )
 import Agda.Syntax.Abstract.Name
 import Agda.Syntax.Internal
 import Agda.TypeChecking.Monad.Base hiding ( conArity )
@@ -27,6 +27,7 @@ import Agda.TypeChecking.Telescope (telView)
 
 import Agda.Utils.EliminateDefaults qualified as TT
 import Agda.Utils.Treeless qualified as CustomTT
+import Agda.TypeChecking.Reduce (reduceDefCopy)
 
 -- * Miscellaneous
 
@@ -82,6 +83,20 @@ isRecordProjection d
   | otherwise
   = Nothing
 
+-- | Try to unfold a definition if introduced by module application.
+maybeUnfoldCopy
+  :: PureTCM m
+  => QName -- ^ Name of the definition.
+  -> Elims
+  -> (Term -> m a)
+  -- ^ Callback if the definition is indeed a copy.
+  -> (QName -> Elims -> m a)
+  -- ^ Callback if the definition isn't a copy.
+  -> m a
+maybeUnfoldCopy f es onTerm onDef =
+  reduceDefCopy f es >>= \case
+    NoReduction ()   -> onDef f es
+    YesReduction _ t -> onTerm t
 
 {-
 lookupCtx :: MonadTCEnv m => Int -> m (String, Type)

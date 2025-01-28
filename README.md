@@ -39,8 +39,10 @@ make -f CoqMakefile
 ## TODO
 
 - [ ] Type aliases (See #3)
+- [ ] Improve type compilation
+    - The (re)implementation of the type translation is currently incomplete.
+      In particular, when compiling an application, we should retrieve the type of the head and compile the elims with it.
 - [ ] Check support for Agda-specific edge cases
-  - [ ] Module applications
   - [ ] Projection-like (See #6)
 - [ ] Support primitives (ints and floats)
 - [ ] Setup compilation to Wasm/Rust using Certicoq

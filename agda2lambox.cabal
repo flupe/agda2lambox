@@ -5,6 +5,8 @@ author:              Orestis Melkonian, Carlos Tomé Cortiñas, Bohdan Liesnikov
 category:            Language, Compiler
 build-type:          Simple
 synopsis:            Compiling Agda code to λ-box.
+license:             MIT
+license-file:        LICENSE
 
 extra-doc-files:    README.md
 
@@ -26,6 +28,7 @@ executable agda2lambox
                        Agda2Lambox.Compile.Function,
                        Agda2Lambox.Compile.Inductive,
                        Agda2Lambox.Compile.Type,
+                       Agda2Lambox.Compile.TypeScheme,
                        Agda2Lambox.Compile,
                        LambdaBox.Names,
                        LambdaBox.Term,

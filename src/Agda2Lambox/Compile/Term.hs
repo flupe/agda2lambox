@@ -170,7 +170,7 @@ compileLitPattern = \case
 
 compileCaseType :: CaseType -> C LBox.Inductive
 compileCaseType = \case
-  CTData qn -> do 
+  CTData qn -> do
     lift $ requireDef qn
     liftTCM $ toInductive qn
   CTNat -> do

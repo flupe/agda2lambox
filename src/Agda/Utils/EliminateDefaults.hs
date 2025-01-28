@@ -26,9 +26,7 @@ import Agda.Compiler.Treeless.Subst () --instance only
 
 
 eliminateCaseDefaults :: TTerm -> TCM TTerm
-eliminateCaseDefaults term = do
-  liftIO $ putStrLn "hello"
-  tr term
+eliminateCaseDefaults = tr
   where
     tr :: TTerm -> TCM TTerm
     tr = \case

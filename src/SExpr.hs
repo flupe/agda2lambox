@@ -186,5 +186,6 @@ instance ToSexp t (GlobalEnv t) where
 
 -- TODO(flupe): handle programs
 instance ToSexp t (CoqModule t) where
-  toSexp t@ToUntyped CoqModule{..} = toSexp t coqEnv
+  toSexp t@ToUntyped CoqModule{..} =
+    toSexp t (coqEnv, ctor t "tConst" [S $ head coqPrograms])
   toSexp t@ToTyped   CoqModule{..} = toSexp t coqEnv

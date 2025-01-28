@@ -44,7 +44,7 @@ instance Pretty ModPath where
     MPDot mp i      -> pretty mp <> "." <> pretty i
 
 instance Pretty KerName where
-  pretty KerName{..} = {- pretty kerModPath <> "." <> -} text kerName
+  pretty KerName{..} = pretty kerModPath <> "." <> text kerName
 
 instance Pretty Inductive where
   pretty Inductive{..} = pretty indMInd <> braces (pretty indInd)
