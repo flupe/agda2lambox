@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>agda2lambox test</title>
+<style>
+body {
+  font-family: 'JetBrains Mono', monospace;
+}
+</style>
+  </head>
+  <body>
+<h1>agda2lambox</h1>
+<pre><code id="output"></code></pre>
+<script type="module">
+const output = document.getElementById("output")
+const FILE = "./Demo.wasm"
+
+const importObject = {
+  env: {
+  }
+}
+
+output.innerHTML += `Loading ${FILE}\n`
+
+let wasm = await fetch(FILE)
+  .then(res => res.arrayBuffer())
+  .then(buf => WebAssembly.compile(buf))
+  .then(mod => new WebAssembly.Instance(mod, importObject))
+
+output.innerHTML += `Compiled successfully!\n`
+output.innerHTML += `Running main_function()\n`
+wasm.exports.main_function()
+
+let res  = wasm.exports.result.value
+let mem  = new Uint32Array(wasm.exports.memory.buffer)
+
+// custom decoders -------------------------
+
+const bool = value => (value >> 1) == 1
+
+const nat = value => {
+  let acc = 0
+  while (!(value & 1)) {
+    value = mem[value + 4 >> 2]
+    acc++
+  }
+  return acc
+}
+
+const list = decoder => value => {
+  let acc = []
+  while (!(value & 1)) {
+    let tag  = mem[value     >> 2]
+    let head = mem[value + 4 >> 2]
+    acc.push(decoder(head))
+    value    = mem[value + 8 >> 2]
+  }
+  return acc
+}
+
+output.innerHTML += `Result: ${list(bool)(res)}\n`
+
+console.log(res)
+</script>
+  </body>
+</html>
