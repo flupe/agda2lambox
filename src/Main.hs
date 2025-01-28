@@ -23,6 +23,7 @@ import Paths_agda2lambox ( version )
 import Agda.Compiler.Common
 import Agda.Compiler.Backend
 import Agda.Main ( runAgda )
+import Agda.Syntax.Internal ( clauseWhereModule )
 import Agda.Syntax.TopLevelModuleName ( TopLevelModuleName, moduleNameToFileName )
 import Agda.Syntax.Common.Pretty ( pretty, prettyShow )
 import Agda.Utils.Monad ( whenM )
@@ -93,13 +94,38 @@ agda2lambox = Backend backend
       }
 
 
+
+-- | Remove all the names defined in where clauses from the list of names.
+-- Assumes that the order is the one given by Agda, that is:
+-- definitions in (possibly anonymous) modules coming from where clauses appear 
+-- right after their parent function definition.
+filterOutWhere :: [QName] -> TCM [QName]
+filterOutWhere [] = pure []
+filterOutWhere (q:qs) = do
+  ws <- getWheres q
+  let qs' = dropWhile (isChild ws) qs
+  (q:) <$> filterOutWhere qs'
+
+  where
+  isChild :: [ModuleName] -> QName -> Bool
+  isChild ws r = any (r `isChildOfMod`) ws
+
+  isChildOfMod :: QName -> ModuleName -> Bool
+  isChildOfMod q mod = qnameModule q `isLeChildModuleOf` mod
+
+  getWheres :: QName -> TCM [ModuleName]
+  getWheres q = do
+    def <- getConstInfo q
+    pure case theDef def of
+      Function{..} -> catMaybes $ map clauseWhereModule funClauses
+      _            -> []
+
 moduleSetup
   :: Options -> IsMain -> TopLevelModuleName -> Maybe FilePath
   -> TCM (Recompile ModuleEnv ModuleRes)
 moduleSetup _ _ m _ = do
   setScope . iInsideScope =<< curIF
   pure $ Recompile ()
-
 
 writeModule
   :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
@@ -109,7 +135,10 @@ writeModule opts menv NotMain _ _   = pure ()
 writeModule Options{..} menv IsMain m defs = do
   programs <- filterM hasPragma defs
   outDir   <- flip fromMaybe optOutDir <$> compileDir
-  env      <- compile optTarget $ reverse defs
+
+  defs' <- filterOutWhere defs
+
+  env <- compile optTarget $ reverse defs'
 
   liftIO $ createDirectoryIfMissing True outDir
 
