@@ -6,34 +6,96 @@
 <style>
 body {
   font-family: 'JetBrains Mono', monospace;
+  height: 100vh;
+  margin: 0;
+  padding: 1rem;
+  box-sizing: border-box;
+  display: grid;
+  gap: 1em;
+  grid-template-rows: auto 1fr;
 }
+h1 {margin: 0 0 .5rem; font-size: 1.4rem}
+pre {
+  overflow-y: scroll;
+  white-space: pre-wrap;
+  border-radius: .3rem;
+  background: #eee;
+  margin: 0;
+  padding: 1rem;
+}
+
+.error { color: #900 }
 </style>
   </head>
   <body>
-<h1>agda2lambox</h1>
+<header>
+  <h1>agda2lambox</h1>
+  <button id="run" disabled>Run</button>
+  <button id="reload" disabled>Reload</button>
+  <select id="decoder">
+    <option value="nat">Nat</option>
+    <option value="bool">Bool</option>
+    <option value="listnat">List Nat</option>
+    <option value="listbool">List Bool</option>
+  </select>
+  <input type="file" id="file" />
+</header>
 <pre><code id="output"></code></pre>
-<script type="module">
-const output = document.getElementById("output")
-const FILE = "./Demo.wasm"
 
-const importObject = {
-  env: {
+<script type="module">
+const on     = (t, e, f) => t.addEventListener(e, f)
+const output = document.getElementById("output")
+
+run.disabled = true
+reload.disabled = true
+
+let wasm = null
+let mem  = null
+
+on(file, "change", load)
+on(reload, "click", load)
+on(run, "click", exec)
+
+async function load() {
+  if (file.files.length == 0) return
+  let [blob] = file.files
+
+  log(`Loading ${blob.name}...`)
+
+  try {
+    wasm =
+      await blob.arrayBuffer()
+        .then(buf => {
+            log("Compiling...")
+            return WebAssembly.compile(buf)
+          })
+        .then(mod => new WebAssembly.Instance(mod))
+
+    log(`Compiled!`)
+
+    run.disabled = false
+    reload.disabled = false
+  } catch (e) {
+    log(`Failed to compile: ${e}`, true)
   }
 }
 
-output.innerHTML += `Loading ${FILE}\n`
+async function exec() {
+  log("Running main_function()")
+  wasm.exports.main_function()
+  let res = wasm.exports.result.value
+  let dec = decoders[decoder.value]
+  mem = new Uint32Array(wasm.exports.memory.buffer)
+  log(`Result: ${dec(res)}`)
+}
 
-let wasm = await fetch(FILE)
-  .then(res => res.arrayBuffer())
-  .then(buf => WebAssembly.compile(buf))
-  .then(mod => new WebAssembly.Instance(mod, importObject))
+function log(str, err = false) { // ugly logging
+  if (err)
+    output.innerHTML += `<span class="error">${str}</span>\n`
+  else output.innerHTML += `${str}\n`
+}
 
-output.innerHTML += `Compiled successfully!\n`
-output.innerHTML += `Running main_function()\n`
-wasm.exports.main_function()
-
-let res  = wasm.exports.result.value
-let mem  = new Uint32Array(wasm.exports.memory.buffer)
+load()
 
 // custom decoders -------------------------
 
@@ -59,9 +121,7 @@ const list = decoder => value => {
   return acc
 }
 
-output.innerHTML += `Result: ${list(bool)(res)}\n`
-
-console.log(res)
+const decoders = {nat, bool, listnat: list(nat), listbool: list(bool) }
 </script>
   </body>
 </html>
