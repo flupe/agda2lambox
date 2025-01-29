@@ -164,6 +164,8 @@ instance Pretty (GlobalDecl t) where
       hang "mutual inductive(s):" 2 $
         vsep $ map pretty indBodies
 
+    TypeAliasDecl _ -> "type alias:"
+
 instance Pretty (GlobalEnv t) where
   pretty (GlobalEnv env) =
     vsep $ flip map (reverse env) \(kn, d) ->

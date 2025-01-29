@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, NamedFieldPuns, OverloadedStrings #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, BangPatterns #-}
 -- | The agda2lambox Agda backend
 module Main (main) where
 
@@ -41,7 +41,7 @@ main :: IO ()
 main = runAgda [agda2lambox]
 
 data Output = RocqOutput | AstOutput
-  deriving (Generic, NFData)
+  deriving (Eq, Show, Generic, NFData)
 
 -- | Backend options.
 data Options = forall t. Options
@@ -91,7 +91,7 @@ agda2lambox = Backend backend
             "Write output files to DIR. (default: project root)"
           , Option ['t'] ["typed"] (NoArg typedOpt) 
             "Compile to typed λ□ environments."
-          , Option ['c'] ["rocq"] (NoArg typedOpt) 
+          , Option ['c'] ["rocq"] (NoArg rocqOpt) 
             "Output a Rocq file."
           ]
       , isEnabled             = \ _ -> True
@@ -120,31 +120,28 @@ writeModule
   -> TCM ModuleRes
 writeModule opts menv NotMain _ _   = pure ()
 writeModule Options{..} menv IsMain m defs = do
-  programs <- filterM hasPragma defs
   outDir   <- flip fromMaybe optOutDir <$> compileDir
-
-  defs' <- filterOutWhere defs
-
-  env <- compile optTarget $ reverse defs'
+  defs'    <- filterOutWhere defs
+  env      <- compile optTarget $ reverse defs'
+  programs <- filterM hasPragma defs'
 
   liftIO $ createDirectoryIfMissing True outDir
 
   let fileName = (outDir </>) . moduleNameToFileName m
       coqMod   = CoqModule env (map qnameToKName programs)
 
+
   liftIO do
     putStrLn $ "Writing " <> fileName ".txt"
+    pp coqMod <> "\n" & writeFile (fileName ".txt")
 
-    pp coqMod <> "\n"
-      & writeFile (fileName ".txt")
+  liftIO $ case optOutput of
+    RocqOutput -> do
+      putStrLn $ "Writing " <> fileName ".v"
+      prettyCoq optTarget coqMod <> "\n"
+        & writeFile (fileName ".v")
 
-    case optOutput of
-      RocqOutput -> do
-        putStrLn $ "Writing " <> fileName ".v"
-        prettyCoq optTarget coqMod <> "\n"
-          & writeFile (fileName ".v")
-
-      AstOutput -> do
-        putStrLn $ "Writing " <> fileName ".ast"
-        prettySexp optTarget coqMod <> "\n"
-          & LText.writeFile (fileName ".ast")
+    AstOutput -> do
+      putStrLn $ "Writing " <> fileName ".ast"
+      prettySexp optTarget coqMod <> "\n"
+        & LText.writeFile (fileName ".ast")
