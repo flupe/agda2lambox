@@ -46,7 +46,7 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
     (pure Nothing) do
 
   -- prepend kername
-  fmap (qnameToKerName defName,) <$> case theDef of
+  fmap (qnameToKName defName,) <$> case theDef of
     GeneralizableVar{} -> pure Nothing
 
     Axiom{} -> do

@@ -53,17 +53,3 @@ instance Pretty Name where
   pretty = \case
     Anon    -> "_"
     Named i -> text i
-
--- * Agda name conversion utilities
-
--- TODO(flupe): sanitization of names
-
--- | Convert an Agda module name to a Rocq equivalent.
-modNameToModPath :: ModuleName -> ModPath
-modNameToModPath MName{..} = MPFile $ map prettyShow mnameToList
-
--- | Convert an Agda identifier to a Rocq equivalent.
-qnameToKerName :: QName -> KerName
-qnameToKerName QName{..} =
-  KerName (modNameToModPath qnameModule)
-          (prettyShow qnameName)

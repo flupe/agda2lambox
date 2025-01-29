@@ -29,12 +29,13 @@ import LambdaBox qualified as LBox
 import Agda.TypeChecking.Substitute (TelV(TelV))
 import Agda.TypeChecking.Telescope (telView)
 import Agda.Utils.Monad (orM)
-import Data.Char (isLower, isUpper, GeneralCategory (DecimalNumber), generalCategory)
+import Data.Char (isLower, isUpper, GeneralCategory (DecimalNumber), generalCategory, isAscii)
 
 
 -- | Convert and Agda module name to its "equivalent" λ□ module path.
 modNameToModPath :: ModuleName -> LBox.ModPath
-modNameToModPath = LBox.MPFile . map prettyShow . mnameToList
+modNameToModPath =
+  LBox.MPFile . map (sanitize . prettyShow) . mnameToList
 
 
 -- | Convert and Agda definition name to a λ□ kernel name.
@@ -121,9 +122,11 @@ sanitize s = concatMap encode s
   where
   encode '$' = "$$"
   encode c
-    | isLower c || isUpper c || c == '_' ||
-      generalCategory c == DecimalNumber =
-      [c]
+    | isAscii c -- more agressive sanitization
+    , isLower c
+    || isUpper c
+    || c == '_'
+    || generalCategory c == DecimalNumber = [c]
     | otherwise = "$" ++ show (fromEnum c)
 
 

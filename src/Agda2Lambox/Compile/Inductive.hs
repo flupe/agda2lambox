@@ -91,7 +91,7 @@ getBundle :: Definition -> InductiveBundle
 getBundle defn@Defn{defName, defType, theDef} =
   case theDef of
     Datatype{dataPars, dataCons} ->
-      Bundle 
+      Bundle
         { indName = defName
         , indType = defType
         , indCons = dataCons

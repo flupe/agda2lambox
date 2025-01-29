@@ -51,6 +51,7 @@ import Agda.Compiler.Treeless.Identity
 import Agda.Compiler.Treeless.Simplify
 import Agda.Compiler.Treeless.Uncase
 import Agda.Compiler.Treeless.Unused
+import Agda.Compiler.Treeless.NormalizeNames
 
 import Agda.Utils.Function
 import Agda.Utils.Functor
@@ -196,6 +197,7 @@ compilerPipeline v q =
     -- NOTE(flupe): those are custom transformations required by the backend
     , compilerPass "ctors"    (30 + v) "eta-expand constructors" $ const etaExpandConstructors
     , compilerPass "defaults" (30 + v) "remove default branches" $ const eliminateCaseDefaults
+    , compilerPass "names"    (30 + v) "normalize names"         $ const normalizeNames
     ]
 
 runPipeline :: EvaluationStrategy -> QName -> Pipeline -> TTerm -> TCM TTerm
