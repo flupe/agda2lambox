@@ -13,7 +13,7 @@ import Data.Maybe ( fromMaybe, listToMaybe )
 import Data.Foldable ( foldrM )
 
 import Agda.Compiler.Backend ( MonadTCState, HasOptions )
-import Agda.Compiler.Backend ( getConstInfo, theDef, pattern Datatype, dataMutual )
+import Agda.Compiler.Backend ( getConstInfo, theDef, pattern Datatype, dataMutual, reportSDoc )
 import Agda.Syntax.Abstract.Name ( ModuleName(..), QName(..) )
 import Agda.Syntax.Builtin ( builtinNat, builtinZero, builtinSuc )
 import Agda.Syntax.Common ( Erased(..) )
@@ -30,6 +30,7 @@ import LambdaBox ( Term(..) )
 import LambdaBox qualified as LBox
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile.Monad
+import Agda.TypeChecking.Pretty (PrettyTCM(prettyTCM))
 
 
 -- * Term compilation monad
@@ -90,7 +91,9 @@ compileTermC = \case
     if n < bound then pure $ LRel n
                  else pure $ LBox -- a type variable
 
-  TPrim p -> genericError $ "primitives not supported: " <> show p
+  TPrim p -> do
+    reportSDoc "agda2lambox.compile.term" 5 $ "primitives not supported: " <> prettyTCM (show p)
+    pure LBox
 
   -- NOTE(flupe):
   -- Assumption:

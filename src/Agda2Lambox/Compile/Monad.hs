@@ -7,6 +7,7 @@ module Agda2Lambox.Compile.Monad
   , genericError
   , genericDocError
   , internalError
+  , runCompile
   ) where
 
 import Control.Monad ( unless )
@@ -88,3 +89,6 @@ compileLoop step = evalStateT unloop . initState
     Just q  -> do
       mr <- step =<< (liftTCM $ getConstInfo q)
       mcons mr <$> loop
+
+runCompile :: CompileM a -> TCM a
+runCompile (Compile c) = evalStateT c (initState [])

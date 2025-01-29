@@ -35,6 +35,7 @@ import Agda2Lambox.Compile       (compile)
 import CoqGen    ( prettyCoq  )
 import SExpr     ( prettySexp )
 import LambdaBox.Env
+import LambdaBox.Names (KerName)
 
 
 main :: IO ()
@@ -72,14 +73,21 @@ defaultOptions = Options
   }
 
 -- | Backend module environments.
-type ModuleEnv = ()
-type ModuleRes = ()
+data BackendEnv = forall t. BackendEnv 
+  { backendTarget :: Target t
+  , backendOutput :: Output
+  , backendOutDir :: Maybe FilePath
+  , backendEnv    :: IORef [(KerName, GlobalDecl t)]
+  }
+
+type ModuleEnv  = ()
+type ModuleRes  = ()
 
 -- | The adga2lambox backend.
 agda2lambox :: Backend
 agda2lambox = Backend backend
   where
-    backend :: Backend' Options Options ModuleEnv ModuleRes QName
+    backend :: Backend' Options BackendEnv ModuleEnv ModuleRes QName
     backend = Backend'
       { backendName           = "agda2lambox"
       , backendInteractTop    = Nothing
@@ -95,7 +103,7 @@ agda2lambox = Backend backend
             "Output a Rocq file."
           ]
       , isEnabled             = \ _ -> True
-      , preCompile            = return
+      , preCompile            = backendSetup
       , postCompile           = \ _ _ _ -> return ()
       , preModule             = moduleSetup
       , postModule            = writeModule
@@ -105,43 +113,53 @@ agda2lambox = Backend backend
       }
 
 
-
+backendSetup :: Options -> TCM BackendEnv
+backendSetup Options{..} = do
+  env <- liftIO $ newIORef []
+  pure BackendEnv 
+    { backendOutDir = optOutDir
+    , backendTarget = optTarget
+    , backendOutput = optOutput
+    , backendEnv    = env
+    }
 
 moduleSetup
-  :: Options -> IsMain -> TopLevelModuleName -> Maybe FilePath
+  :: BackendEnv -> IsMain -> TopLevelModuleName -> Maybe FilePath
   -> TCM (Recompile ModuleEnv ModuleRes)
 moduleSetup _ _ m _ = do
   setScope . iInsideScope =<< curIF
   pure $ Recompile ()
 
 writeModule
-  :: Options -> ModuleEnv -> IsMain -> TopLevelModuleName
+  :: BackendEnv -> ModuleEnv -> IsMain -> TopLevelModuleName
   -> [QName]
   -> TCM ModuleRes
-writeModule opts menv NotMain _ _   = pure ()
-writeModule Options{..} menv IsMain m defs = do
-  outDir   <- flip fromMaybe optOutDir <$> compileDir
-  defs'    <- filterOutWhere defs
-  env      <- compile optTarget $ reverse defs'
-  programs <- filterM hasPragma defs'
+writeModule BackendEnv{..} menv isMain m defs   = do
+  defs' <- filterOutWhere defs
+  liftIO $ putStrLn $ prettyShow m
+  compile backendTarget backendEnv defs'
 
-  liftIO $ createDirectoryIfMissing True outDir
+  when (isMain == IsMain) do
+    env      <- liftIO $ readIORef backendEnv
+    programs <- filterM hasPragma defs'
+    outDir   <- flip fromMaybe backendOutDir <$> compileDir
 
-  let fileName = (outDir </>) . moduleNameToFileName m
-      coqMod   = CoqModule env (map qnameToKName programs)
+    liftIO $ createDirectoryIfMissing True outDir
 
+    let fileName = (outDir </>) . moduleNameToFileName m
+        coqMod   = CoqModule (GlobalEnv env) (map qnameToKName programs)
 
-  liftIO do
-    putStrLn $ "Writing " <> fileName ".txt"
-    pp coqMod <> "\n" & writeFile (fileName ".txt")
+    liftIO do
+      putStrLn $ "Writing " <> fileName ".txt"
+      pp coqMod <> "\n" & writeFile (fileName ".txt")
 
-  liftIO $ case optOutput of
-    RocqOutput -> do
-      putStrLn $ "Writing " <> fileName ".v"
-      prettyCoq optTarget coqMod <> "\n"
-        & writeFile (fileName ".v")
+    liftIO $ case backendOutput of
+      RocqOutput -> do
+        putStrLn $ "Writing " <> fileName ".v"
+        prettyCoq backendTarget coqMod <> "\n"
+          & writeFile (fileName ".v")
 
-    AstOutput -> do
-      putStrLn $ "Writing " <> fileName ".ast"
-      prettySexp optTarget coqMod <> "\n"
-        & LText.writeFile (fileName ".ast")
+      AstOutput -> do
+        putStrLn $ "Writing " <> fileName ".ast"
+        prettySexp backendTarget coqMod <> "\n"
+          & LText.writeFile (fileName ".ast")

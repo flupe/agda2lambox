@@ -29,10 +29,18 @@ import LambdaBox.Env (GlobalEnv(..), GlobalDecl(..), ConstantBody(..))
 import LambdaBox.Type qualified as LamBox
 
 import Agda2Lambox.Compile.Type (compileTopLevelType)
+import Data.Foldable (traverse_)
 
 -- | Compile the given names to a λ□ environment.
-compile :: Target t -> [QName] -> TCM (GlobalEnv t)
-compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
+-- compile :: Target t -> [QName] -> TCM (GlobalEnv t)
+-- compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
+
+compile :: Target t -> IORef [(KerName, GlobalDecl t)] -> [QName] -> TCM ()
+compile target renv = traverse_ \q ->  do
+  def <- getConstInfo q
+  runCompile (compileDefinition target def)  >>= \case
+    Nothing   -> pure ()
+    Just decl -> liftIO $ modifyIORef' renv (decl:)
 
 compileDefinition :: Target t -> Definition -> CompileM (Maybe (KerName, GlobalDecl t))
 compileDefinition target defn@Defn{..} = setCurrentRange defName do
@@ -67,9 +75,12 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
 
     Primitive{..} -> do
       reportSDoc "agda2lambox.compile" 5 $
-        "Found primitive: " <> prettyTCM defName <> ". Compiling it as axiom."
+        "Found primitive: " <> prettyTCM defName <> ". Ignoring it as axiom."
 
-      typ <- whenTyped target $ compileTopLevelType defType
-      pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
+      pure Nothing
+      -- typ <- whenTyped target $ compileTopLevelType defType
+      -- pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
+
+    PrimitiveSort{..} -> pure Nothing
 
     _ -> genericError $ "Cannot compile: " <> prettyShow defName
