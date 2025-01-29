@@ -17,6 +17,7 @@ CoqMakefile.conf
 .direnv
 result
 
-test/*.txt
-test/*.v
-test/*.glob
+*.txt
+*.ast
+*.v
+*.glob

@@ -19,7 +19,8 @@ import Agda.Syntax.Builtin ( builtinNat, builtinZero, builtinSuc )
 import Agda.Syntax.Common ( Erased(..) )
 import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Literal
-import Agda.Syntax.Treeless ( TTerm(..), TAlt(..), CaseInfo(..), CaseType(..) )
+import Agda.Syntax.Treeless
+  ( TTerm(..), TAlt(..), CaseInfo(..), CaseType(..), TPrim(..) )
 import Agda.TypeChecking.Datatypes ( getConstructorData, getConstructors )
 import Agda.TypeChecking.Monad.Base ( TCM , liftTCM, MonadTCEnv, MonadTCM )
 import Agda.TypeChecking.Monad.Builtin ( getBuiltinName_ )
@@ -89,7 +90,7 @@ compileTermC = \case
     if n < bound then pure $ LRel n
                  else pure $ LBox -- a type variable
 
-  TPrim p -> genericError "primitives not supported"
+  TPrim p -> genericError $ "primitives not supported: " <> show p
 
   -- NOTE(flupe):
   -- Assumption:
@@ -107,6 +108,9 @@ compileTermC = \case
   TCon q -> do
     lift $ requireDef q
     liftTCM $ toConApp q []
+
+  -- TODO: maybe not ignore seq? (c.f. issue #12)
+  TApp (TPrim PSeq) args -> compileTermC (last args)
 
   TApp (TCon q) args -> do
     lift $ requireDef q
