@@ -125,7 +125,7 @@ actuallyConvertInductive t defn = do
       isParamArity   <- liftTCM $ isArity domType
       let isParamSort = isJust  $ isSort $ unEl $ domType
       pure LBox.TypeVarInfo
-        { tvarName      = maybe LBox.Anon (LBox.Named . prettyShow) $ domName pdom
+        { tvarName      = maybe LBox.Anon (LBox.Named . sanitize . prettyShow) $ domName pdom
         , tvarIsLogical = isParamLogical
         , tvarIsArity   = isParamArity
         , tvarIsSort    = isParamSort
@@ -143,13 +143,13 @@ actuallyConvertInductive t defn = do
           compileArgs indPars conTel
 
         pure LBox.Constructor
-          { cstrName  = prettyShow $ qnameName cname
+          { cstrName  = sanitize $ prettyShow $ qnameName cname
           , cstrArgs  = arity
           , cstrTypes = conTypeInfo
           }
 
     pure LBox.OneInductive
-      { indName          = prettyShow $ qnameName indName
+      { indName          = sanitize $ prettyShow $ qnameName indName
       , indPropositional = False        -- TODO(flupe)
       , indKElim         = LBox.IntoAny -- TODO(flupe)
       , indCtors         = ctors

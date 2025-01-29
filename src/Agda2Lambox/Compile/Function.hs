@@ -87,7 +87,7 @@ compileFunction (t :: Target t) defn@Defn{defType} = do
       projTel <- telViewUpTo recPars defType
       projType <- theCore <$> telViewUpTo recPars defType
       let names  = map domName $ toList $ theTel projTel
-          pnames = map (maybe LBox.Anon (LBox.Named . prettyShow)) names
+          pnames = map (maybe LBox.Anon (LBox.Named . sanitize . prettyShow)) names
       (pnames,) <$> compileType recPars projType
 
     -- TODO(flupe): ^ take care of projection-like functions
@@ -108,7 +108,7 @@ compileFunction (t :: Target t) defn@Defn{defType} = do
       forM mdefs \def@Defn{defName} -> do
         body <- compileFunctionBody mnames def
         return LBox.Def
-          { dName = LBox.Named $ prettyShow defName
+          { dName = qnameToName defName
           , dBody = body
           , dArgs = 0
           }

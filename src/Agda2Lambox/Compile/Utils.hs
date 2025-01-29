@@ -2,10 +2,12 @@
 module Agda2Lambox.Compile.Utils
   ( modNameToModPath
   , qnameToKName
+  , qnameToName
   , dataOrRecDefMutuals
   , dataOrRecMutuals
   , toInductive
   , toConApp
+  , sanitize
   , MayBeLogical(isLogical)
   ) where
 
@@ -27,6 +29,7 @@ import LambdaBox qualified as LBox
 import Agda.TypeChecking.Substitute (TelV(TelV))
 import Agda.TypeChecking.Telescope (telView)
 import Agda.Utils.Monad (orM)
+import Data.Char (isLower, isUpper, GeneralCategory (DecimalNumber), generalCategory)
 
 
 -- | Convert and Agda module name to its "equivalent" λ□ module path.
@@ -39,7 +42,10 @@ qnameToKName :: QName -> LBox.KerName
 qnameToKName qn =
   LBox.KerName
     (modNameToModPath $ qnameModule qn)
-    (prettyShow $ qnameName qn)
+    (sanitize $ prettyShow $ qnameName qn)
+
+qnameToName :: QName -> LBox.Name
+qnameToName q = LBox.Named (sanitize $ prettyShow $ qnameName q)
 
 dataOrRecDefMutuals :: Definition -> TCM [QName]
 dataOrRecDefMutuals d = do
@@ -105,6 +111,21 @@ instance MayBeLogical Type where
         SizeUniv{}  -> True -- SizeUniv
         LevelUniv{} -> True -- LevelUniv
         _           -> False
+
+
+-- | Sanitize an agda name to something without unicode.
+-- Must be injective.
+-- We may require a smarter transformation later on for other targets.
+sanitize :: String -> String
+sanitize s = concatMap encode s
+  where
+  encode '$' = "$$"
+  encode c
+    | isLower c || isUpper c || c == '_' ||
+      generalCategory c == DecimalNumber =
+      [c]
+    | otherwise = "$" ++ show (fromEnum c)
+
 
 -- | Additionally, we consider erased domains logical.
 instance MayBeLogical a => MayBeLogical (Dom a) where
