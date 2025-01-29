@@ -5,9 +5,9 @@ module Agda.Utils where
 
 import Control.Applicative ( liftA2 )
 import Data.Bifunctor ( second )
-import Data.Maybe ( isJust, isNothing )
+import Data.Maybe ( isJust, isNothing, catMaybes )
 
-import Agda.Compiler.Backend ( getUniqueCompilerPragma, PureTCM )
+import Agda.Compiler.Backend ( getUniqueCompilerPragma, PureTCM, HasConstInfo (getConstInfo) )
 import Agda.Syntax.Abstract.Name
 import Agda.Syntax.Internal
 import Agda.TypeChecking.Monad.Base hiding ( conArity )
@@ -97,6 +97,31 @@ maybeUnfoldCopy f es onTerm onDef =
   reduceDefCopy f es >>= \case
     NoReduction ()   -> onDef f es
     YesReduction _ t -> onTerm t
+
+-- | Remove all the names defined in where clauses from the list of names.
+-- Assumes that the order is the one given by Agda, that is:
+-- definitions in (possibly anonymous) modules coming from where clauses appear 
+-- right after their parent function definition.
+filterOutWhere :: [QName] -> TCM [QName]
+filterOutWhere [] = pure []
+filterOutWhere (q:qs) = do
+  ws <- getWheres q
+  let qs' = dropWhile (isChild ws) qs
+  (q:) <$> filterOutWhere qs'
+
+  where
+  isChild :: [ModuleName] -> QName -> Bool
+  isChild ws r = any (r `isChildOfMod`) ws
+
+  isChildOfMod :: QName -> ModuleName -> Bool
+  isChildOfMod q mod = qnameModule q `isLeChildModuleOf` mod
+
+  getWheres :: QName -> TCM [ModuleName]
+  getWheres q = do
+    def <- getConstInfo q
+    pure case theDef def of
+      Function{..} -> catMaybes $ map clauseWhereModule funClauses
+      _            -> []
 
 {-
 lookupCtx :: MonadTCEnv m => Int -> m (String, Type)

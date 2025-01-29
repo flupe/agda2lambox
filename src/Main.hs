@@ -28,7 +28,7 @@ import Agda.Syntax.TopLevelModuleName ( TopLevelModuleName, moduleNameToFileName
 import Agda.Syntax.Common.Pretty ( pretty, prettyShow )
 import Agda.Utils.Monad ( whenM )
 
-import Agda.Utils ( pp, hasPragma, isDataOrRecDef )
+import Agda.Utils ( pp, hasPragma, isDataOrRecDef, filterOutWhere )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile       (compile)
@@ -40,13 +40,18 @@ import LambdaBox.Env
 main :: IO ()
 main = runAgda [agda2lambox]
 
+data Output = RocqOutput | AstOutput
+  deriving (Generic, NFData)
+
 -- | Backend options.
 data Options = forall t. Options
   { optOutDir :: Maybe FilePath
   , optTarget :: Target t
+  , optOutput :: Output
   }
 
-instance NFData Options where rnf (Options m t) = rnf m `seq` rnf t
+instance NFData Options where
+  rnf (Options m t o) = rnf m `seq` rnf t `seq` rnf o
 
 -- | Setter for output directory option.
 outdirOpt :: Monad m => FilePath -> Options -> m Options
@@ -55,11 +60,15 @@ outdirOpt dir opts = return opts { optOutDir = Just dir }
 typedOpt :: Monad m => Options -> m Options
 typedOpt opts = return opts { optTarget = ToTyped }
 
+rocqOpt :: Monad m => Options -> m Options
+rocqOpt opts = return opts { optOutput = RocqOutput }
+
 -- | Default backend options.
 defaultOptions :: Options
 defaultOptions = Options
   { optOutDir = Nothing
   , optTarget = ToUntyped
+  , optOutput = AstOutput
   }
 
 -- | Backend module environments.
@@ -82,6 +91,8 @@ agda2lambox = Backend backend
             "Write output files to DIR. (default: project root)"
           , Option ['t'] ["typed"] (NoArg typedOpt) 
             "Compile to typed λ□ environments."
+          , Option ['c'] ["rocq"] (NoArg typedOpt) 
+            "Output a Rocq file."
           ]
       , isEnabled             = \ _ -> True
       , preCompile            = return
@@ -95,30 +106,6 @@ agda2lambox = Backend backend
 
 
 
--- | Remove all the names defined in where clauses from the list of names.
--- Assumes that the order is the one given by Agda, that is:
--- definitions in (possibly anonymous) modules coming from where clauses appear 
--- right after their parent function definition.
-filterOutWhere :: [QName] -> TCM [QName]
-filterOutWhere [] = pure []
-filterOutWhere (q:qs) = do
-  ws <- getWheres q
-  let qs' = dropWhile (isChild ws) qs
-  (q:) <$> filterOutWhere qs'
-
-  where
-  isChild :: [ModuleName] -> QName -> Bool
-  isChild ws r = any (r `isChildOfMod`) ws
-
-  isChildOfMod :: QName -> ModuleName -> Bool
-  isChildOfMod q mod = qnameModule q `isLeChildModuleOf` mod
-
-  getWheres :: QName -> TCM [ModuleName]
-  getWheres q = do
-    def <- getConstInfo q
-    pure case theDef def of
-      Function{..} -> catMaybes $ map clauseWhereModule funClauses
-      _            -> []
 
 moduleSetup
   :: Options -> IsMain -> TopLevelModuleName -> Maybe FilePath
@@ -146,13 +133,18 @@ writeModule Options{..} menv IsMain m defs = do
       coqMod   = CoqModule env (map qnameToKName programs)
 
   liftIO do
-    putStrLn $ "Writing " <> fileName ".{v,txt,ast}"
+    putStrLn $ "Writing " <> fileName ".txt"
 
     pp coqMod <> "\n"
       & writeFile (fileName ".txt")
 
-    prettyCoq optTarget coqMod <> "\n"
-      & writeFile (fileName ".v")
+    case optOutput of
+      RocqOutput -> do
+        putStrLn $ "Writing " <> fileName ".v"
+        prettyCoq optTarget coqMod <> "\n"
+          & writeFile (fileName ".v")
 
-    prettySexp optTarget coqMod <> "\n"
-      & LText.writeFile (fileName ".ast")
+      AstOutput -> do
+        putStrLn $ "Writing " <> fileName ".ast"
+        prettySexp optTarget coqMod <> "\n"
+          & LText.writeFile (fileName ".ast")
