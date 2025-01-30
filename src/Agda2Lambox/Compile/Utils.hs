@@ -1,4 +1,5 @@
-{-# LANGUAGE NamedFieldPuns, FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns, FlexibleInstances, DeriveAnyClass #-}
+{-# LANGUAGE DeriveTraversable #-}
 module Agda2Lambox.Compile.Utils
   ( modNameToModPath
   , qnameToKName
@@ -7,13 +8,21 @@ module Agda2Lambox.Compile.Utils
   , dataOrRecMutuals
   , toInductive
   , toConApp
-  , sanitize
   , MayBeLogical(isLogical)
+  , sanitize
+  , CompiledItem(..)
+  , topoSort
   ) where
 
+import Control.Monad.State
 import Control.Monad.IO.Class ( liftIO )
+import Data.Bifunctor ( bimap )
 import Data.List ( elemIndex )
-import Data.Maybe ( fromMaybe, listToMaybe, isJust )
+import Data.Maybe ( fromMaybe, listToMaybe, isJust, catMaybes )
+import Data.Set ( Set )
+import Data.Map ( Map )
+import Data.Set qualified as Set
+import Data.Map qualified as Map
 
 import Agda.Syntax.Internal
 import Agda.Syntax.Abstract.Name
@@ -23,6 +32,7 @@ import Agda.TypeChecking.Datatypes ( getConstructors, getConstructorData )
 import Agda.TypeChecking.Level ( isLevelType )
 import Agda.TypeChecking.Monad.SizedTypes ( isSizeType )
 import Agda.TypeChecking.Monad.Base ( TCM )
+import Agda.Utils.Monad ( unlessM )
 import Agda.Compiler.Backend 
 
 import LambdaBox qualified as LBox
@@ -113,6 +123,14 @@ instance MayBeLogical Type where
         LevelUniv{} -> True -- LevelUniv
         _           -> False
 
+-- | Additionally, we consider erased domains logical.
+instance MayBeLogical a => MayBeLogical (Dom a) where
+  isLogical dom | not (usableModality dom) = pure True
+  isLogical dom = isLogical $ unDom dom
+
+instance MayBeLogical a => MayBeLogical (Arg a) where
+  isLogical arg | not (usableModality arg) = pure True
+  isLogical arg = isLogical $ unArg arg
 
 -- | Sanitize an agda name to something without unicode.
 -- Must be injective.
@@ -129,12 +147,47 @@ sanitize s = concatMap encode s
     || generalCategory c == DecimalNumber = [c]
     | otherwise = "$" ++ show (fromEnum c)
 
+-- * Compilation items and topological sort
 
--- | Additionally, we consider erased domains logical.
-instance MayBeLogical a => MayBeLogical (Dom a) where
-  isLogical dom | not (usableModality dom) = pure True
-  isLogical dom = isLogical $ unDom dom
+-- | Named compilation item, with a set of dependencies.
+data CompiledItem a = CompiledItem
+  { itemName  :: QName
+  , itemDeps  :: [QName]
+  , itemValue :: a
+  } deriving (Functor, Foldable, Traversable)
 
-instance MayBeLogical a => MayBeLogical (Arg a) where
-  isLogical arg | not (usableModality arg) = pure True
-  isLogical arg = isLogical $ unArg arg
+-- | Stateful monad for the topological sort.
+-- State contains the list of items that have been permanently inserted,
+-- along with their names.
+type TopoM a = State (Set QName, [CompiledItem a])
+
+-- | Topological sort of compiled items, based on dependencies.
+-- Skipped items are required for dependency analysis, as they
+-- can transively force ordering
+-- (e.g constructors are skipped but force compilation of their datatype).
+-- In the end, we get a list of items that are effectively compiled.
+topoSort :: forall a. [CompiledItem (Maybe a)] -> [CompiledItem a]
+topoSort defs = snd $ execState (traverse (visit Set.empty) defs) (Set.empty, [])
+  where
+    items = Map.fromList $ map (\x -> (itemName x, x)) defs
+
+    -- | Whether an item has been permanently inserted already
+    isMarked :: QName -> TopoM a Bool
+    isMarked q = Set.member q <$> gets fst
+
+    push :: CompiledItem (Maybe a) -> TopoM a ()
+    push item@CompiledItem{itemName, itemValue}
+      | Just value <- itemValue
+      = modify $ bimap (Set.insert itemName) (item {itemValue = value}:)
+      | otherwise = pure ()
+
+    visit :: Set QName -> CompiledItem (Maybe a) -> TopoM a ()
+    visit temp item@CompiledItem{..} = do
+      -- NOTE(flupe): Visiting an item that has already been temporarily marked
+      --  means something went wrong and we have a cycle in the graph.
+      --  We could throw an error, but this should never happen.
+      --  Here, we continue and pick an arbitrary order.
+      unlessM ((Set.member itemName temp ||) <$> isMarked itemName) do
+        let deps = catMaybes $ (`Map.lookup` items) <$> itemDeps
+        traverse (visit (Set.insert itemName temp)) deps
+        push item

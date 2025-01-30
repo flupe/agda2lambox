@@ -3,19 +3,17 @@
 -- | The agda2lambox Agda backend
 module Main (main) where
 
-import Control.Monad ( unless, when, forM_, filterM )
+import Control.Monad ( unless, filterM )
 import Control.Monad.IO.Class ( liftIO )
 import Control.DeepSeq ( NFData(rnf) )
 import Data.Function ( (&) )
-import Data.IORef ( IORef, newIORef, readIORef, modifyIORef' )
-import Data.Maybe ( fromMaybe, catMaybes )
+import Data.Maybe ( fromMaybe )
 import Data.Version ( showVersion )
 import Data.Text ( pack )
 import GHC.Generics ( Generic )
 import System.Console.GetOpt ( OptDescr(Option), ArgDescr(..) )
 import System.Directory ( createDirectoryIfMissing )
 import System.FilePath ( (</>) )
-import Data.Kind (Type)
 import Data.Text.Lazy.IO qualified as LText
 
 import Paths_agda2lambox ( version )
@@ -26,9 +24,8 @@ import Agda.Main ( runAgda )
 import Agda.Syntax.Internal ( clauseWhereModule )
 import Agda.Syntax.TopLevelModuleName ( TopLevelModuleName, moduleNameToFileName )
 import Agda.Syntax.Common.Pretty ( pretty, prettyShow )
-import Agda.Utils.Monad ( whenM )
 
-import Agda.Utils ( pp, hasPragma, isDataOrRecDef, filterOutWhere )
+import Agda.Utils ( pp, hasPragma )
 import Agda2Lambox.Compile.Target
 import Agda2Lambox.Compile.Utils
 import Agda2Lambox.Compile       (compile)
@@ -119,9 +116,8 @@ writeModule
 writeModule opts menv NotMain _ _   = pure ()
 writeModule Options{..} menv IsMain m defs = do
   outDir   <- flip fromMaybe optOutDir <$> compileDir
-  defs'    <- filterOutWhere defs
-  env      <- compile optTarget $ reverse defs'
-  programs <- filterM hasPragma defs'
+  env      <- compile optTarget defs
+  programs <- filterM hasPragma defs
 
   liftIO $ createDirectoryIfMissing True outDir
 

@@ -8,18 +8,13 @@ import Data.IORef
 
 import Control.Monad.State
 
-import Data.Bifunctor (bimap)
-import Data.Set (Set)
-import Data.Map (Map)
-import Data.Map qualified as Map
-import Data.Set qualified as Set
 import Agda.Compiler.Backend
 import Agda.Syntax.Internal ( QName )
 import Agda.Syntax.Common (Arg(..), IsOpaque (TransparentDef))
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.TypeChecking.Monad ( liftTCM, getConstInfo )
 import Agda.TypeChecking.Pretty
-import Agda.Utils.Monad ( whenM, ifM, unlessM, ifNotM, orM, forM_ )
+import Agda.Utils.Monad ( ifM, ifNotM, orM )
 import Agda.Utils.SmallSet qualified as SmallSet
 
 import Agda.Utils ( hasPragma, isDataOrRecDef, treeless, isArity )
@@ -31,49 +26,21 @@ import Agda2Lambox.Compile.Term       ( compileTerm )
 import Agda2Lambox.Compile.Function   ( compileFunction )
 import Agda2Lambox.Compile.Inductive  ( compileInductive )
 import Agda2Lambox.Compile.TypeScheme ( compileTypeScheme )
+import Agda2Lambox.Compile.Type       ( compileTopLevelType )
 
 import LambdaBox.Names
 import LambdaBox.Env (GlobalEnv(..), GlobalDecl(..), ConstantBody(..))
-import LambdaBox.Type qualified as LamBox
 
-import Agda2Lambox.Compile.Type (compileTopLevelType)
-import Data.Foldable (foldrM)
-import Agda.Utils.Maybe (catMaybes, mapMaybe, isJust)
 
--- | Compile the given names to a λ□ environment.
+
+-- | Compile the given names into to a λ□ environment.
 compile :: Target t -> [QName] -> TCM (GlobalEnv t)
 compile t qs = do
-  items <- topoSort <$> compileLoop (compileDefinition t) qs
-
-  let skipped = flip mapMaybe items \item ->
-        case itemValue item of
-          Nothing -> Nothing
-          Just x  -> Just (item { itemValue = x })
-
-  pure $ GlobalEnv $ flip map skipped \CompiledItem{..} ->
-    (qnameToKName itemName, itemValue)
-
-
--- TODO(flupe): move this somewhere else
-type TopoM a = State (Set QName, [CompiledItem a])
-
-topoSort :: forall a. [CompiledItem a] -> [CompiledItem a]
-topoSort defs = snd $ execState (traverse (visit Set.empty) defs) (Set.empty, [])
+  items <- compileLoop (compileDefinition t) qs
+  pure $ GlobalEnv $ map itemToEntry items
   where
-    items = Map.fromList $ map (\x -> (itemName x, x)) defs
-
-    isMarked :: QName -> TopoM a Bool
-    isMarked q = Set.member q <$> gets fst
-
-    push :: CompiledItem a -> TopoM a ()
-    push item@CompiledItem{itemName} = modify $ bimap (Set.insert itemName) (item:)
-
-    visit :: Set QName -> CompiledItem a -> TopoM a ()
-    visit temp item@CompiledItem{..} = do
-      unlessM ((Set.member itemName temp ||) <$> isMarked itemName) do
-        let deps = catMaybes $ (`Map.lookup` items) <$> itemDeps
-        traverse (visit (Set.insert itemName temp)) deps
-        push item
+    itemToEntry :: CompiledItem (GlobalDecl t) -> (KerName, GlobalDecl t)
+    itemToEntry CompiledItem{..} = (qnameToKName itemName, itemValue)
 
 
 compileDefinition :: Target t -> Definition -> CompileM (Maybe (GlobalDecl t))
@@ -109,18 +76,23 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
 
     Primitive{..} -> do
       reportSDoc "agda2lambox.compile" 5 $
-        "Found primitive: " <> prettyTCM defName <> ". Compiling it as axiom."
+        "Found primitive: " <> prettyTCM defName
 
       getBuiltinThing (PrimitiveName primName) >>= \case
-        -- it's a primitive with an actual implementation
+
+        -- if it's a primitive with an actual implementation
         -- we try to convert it to a function, manually
         Just (Prim (PrimFun{})) -> do
-          let def = Function
+          reportSDoc "agda2lambox.compile" 5 $
+            "It's a builtin, converting it to a function."
+          let
+            defn' = defn
+              { theDef = Function
                 { funClauses    = primClauses
                 , funCompiled   = primCompiled
                 , funSplitTree  = Nothing
                 , funTreeless   = Nothing
-                , funCovering   = []
+                , funCovering   = [] -- NOTE(flupe): should we try computing this?
                 , funInv        = primInv
                 , funMutual     = Just [defName]
                 , funProjection = Left NeverProjection
@@ -131,12 +103,17 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
                 , funIsKanOp    = Nothing
                 , funOpaque     = TransparentDef
                 }
+              }
 
-          let defn' = defn {theDef = def}
           liftTCM $ modifyGlobalDefinition defName $ const defn'
+
+          -- and then we compile it as a regular function
           compileFunction target defn'
 
+        -- otherwise, compiling it as an axiom
         _ -> do
+          reportSDoc "agda2lambox.compile" 5 $
+            "Compiling it to an axiom."
           typ <- whenTyped target $ compileTopLevelType defType
           pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
 

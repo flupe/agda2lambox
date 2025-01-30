@@ -15,8 +15,6 @@ import Control.Monad.State
 import Control.Monad.IO.Class ( MonadIO )
 import Data.Set ( Set )
 import Data.Set qualified as Set
-import Queue.Ephemeral ( EphemeralQueue(..) )
-import Queue.Ephemeral qualified as Queue
 
 import Agda.Syntax.Abstract (QName)
 import Agda.Compiler.Backend (getConstInfo, PureTCM, HasConstInfo, HasBuiltins, canonicalName)
@@ -27,26 +25,23 @@ import Agda.Utils.List ( mcons )
 import Agda.TypeChecking.Pretty
 import Control.Monad.Error.Class (MonadError)
 
+import Agda2Lambox.Compile.Utils (CompiledItem(..), topoSort)
+
 -- | Backend compilation state.
 data CompileState = CompileState
   { seenDefs     :: Set QName
-    -- ^ Names that we have seen, either already compiled or in the queue.
-  , compileQueue :: EphemeralQueue QName
-    -- ^ Compilation queue.
+    -- ^ Names that we have seen, either already compiled or in the stack.
+  , compileStack :: [QName]
+    -- ^ Compilation stack.
   , requiredDefs :: Set QName
     -- ^ (Locally) required definitions.
   }
-
--- NOTE(flupe):
--- - We use a Queue to do a BFS traversal of definitions rather than DFS.
---   i.e try to compile "related" definitions together.
--- - We use an EphemeralQueue because we don't rely on persistence at all.
 
 -- | Initial compile state, with a set of names required for compilation.
 initState :: [QName] -> CompileState
 initState qs = CompileState
   { seenDefs     = Set.fromList qs
-  , compileQueue = Queue.fromList qs
+  , compileStack = qs
   , requiredDefs = Set.empty
   }
 
@@ -62,7 +57,6 @@ requireDef :: QName -> CompileM ()
 requireDef q = Compile $ do
   q <- liftTCM $ canonicalName q
 
-
   -- add name to the required list
   modify \ s -> s { requiredDefs = Set.insert q (requiredDefs s) }
 
@@ -76,21 +70,16 @@ requireDef q = Compile $ do
 
     modify \ s -> s
       { seenDefs     = Set.insert q seen
-      , compileQueue = Queue.enqueue q $ compileQueue s
+      , compileStack = q : compileStack s
       }
 
 -- | Get the next qname to be compiled, if there is one.
 nextUnit :: CompileM (Maybe QName)
 nextUnit = Compile $
-  gets compileQueue >>= \case
-    Empty        -> pure Nothing
-    Full q queue -> Just q <$ modify \s -> s { compileQueue = queue }
+  gets compileStack >>= \case
+    []   -> pure Nothing
+    q:qs -> Just q <$ modify \ s -> s {compileStack = qs}
 
-data CompiledItem a = CompiledItem
-  { itemName  :: QName
-  , itemDeps  :: [QName]
-  , itemValue :: a
-  } deriving (Functor, Foldable, Traversable)
 
 -- | Record the required definitions of a compilation unit.
 trackDeps :: CompileM a -> CompileM (a, [QName])
@@ -101,20 +90,18 @@ trackDeps (Compile c) = Compile do
   pure (x, Set.toList deps)
 
 -- | Run the processing function as long as there are names to be compiled.
+--  Returns a list of compiled items, (topologically) sorted by dependency order.
+--  This means that whenever @A@ depends on @B@, @A@ will appear before @B@ in the list.
 compileLoop
-  :: forall a. (Definition -> CompileM a) -- ^ The compilation function
-  -> [QName]                            -- ^ Names to compile
+  :: forall a. (Definition -> CompileM (Maybe a))
+       -- ^ The compilation function
+  -> [QName] -- ^ Initial names to compile
   -> TCM [CompiledItem a]
-compileLoop step = evalStateT unloop . initState
+compileLoop step names = topoSort <$> evalStateT unloop (initState names)
   where
-  loop :: CompileM [CompiledItem a]
+  loop :: CompileM [CompiledItem (Maybe a)]
   loop@(Compile unloop) = nextUnit >>= \case
     Nothing -> pure []
     Just q  -> do
       (mr, deps) <- trackDeps . step =<< (liftTCM $ getConstInfo q)
-      let item = CompiledItem 
-              { itemName  = q
-              , itemDeps  = deps
-              , itemValue = mr
-              }
-      (item:) <$> loop
+      (CompiledItem q deps mr:) <$> loop
