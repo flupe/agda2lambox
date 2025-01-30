@@ -1,5 +1,6 @@
 module _ where
 
+{-
 -- - decision procedure (barebones)
 module BAREBONES where
   open import Agda.Primitive using (Level)
@@ -36,17 +37,19 @@ module BAREBONES where
   instance
     HasDecEq-Nat : HasDec (x ≡ y)
     HasDecEq-Nat {x}{y} .dec with x | y
-    ... | zero | zero = yes refl
-    ... | zero | suc n = no λ ()
+    ... | zero  | zero = yes refl
+    ... | zero  | suc n = no λ ()
     ... | suc m | zero = no λ ()
     ... | suc m | suc n with dec
-    ... | yes eq  = yes (cong suc eq)
+    ... | yes eq   = yes (cong suc eq)
     ... | no  m≢n = no λ where refl → m≢n refl
 
   test : Bool
-  test = isYes (dec {A = 42 ≡ 42})
-  -- {-# COMPILE AGDA2LAMBOX test #-}
+  test = isYes (dec {A = 4 ≡ 4})
+  {-# COMPILE AGDA2LAMBOX test #-}
+-- -}
 
+{-
 -- - decision procedure (importing stdlib)
 module STDLIB where
   open import Relation.Nullary using (isYes)
@@ -54,8 +57,8 @@ module STDLIB where
   open import Data.Bool using (Bool; true; false)
   open import Data.Bool.Properties using (_≟_)
   test : Bool
-  test = isYes (true ≟ false)
-  -- {-# COMPILE AGDA2LAMBOX test #-}
+  test = isYes (false ≟ true)
+  {-# COMPILE AGDA2LAMBOX test #-}
 
   -- open import Data.Bool using (Bool)
   -- open import Data.Nat.Properties using (_≟_)
@@ -63,21 +66,27 @@ module STDLIB where
   -- test = isYes (42 ≟ 42)
   -- {-# COMPILE AGDA2LAMBOX test #-}
 
+-- -}
+
+-- {-
 -- - sort
 module SORT where
-  open import Data.List.Base using (List; _∷_; [])
+  -- open import Data.List.Base using (List; _∷_; [])
+  -- open import Data.Bool.Properties using (≤-decTotalOrder)
+  -- open import Data.Bool using (Bool; true; false)
+  -- open import Data.List.Sort ≤-decTotalOrder using (sort)
 
-  open import Data.Bool.Properties using (≤-decTotalOrder)
-  open import Data.Bool using (Bool; true; false)
+  -- test : List Bool
+  -- test = sort (true ∷ false ∷ true ∷ false ∷ [])
+  -- {-# COMPILE AGDA2LAMBOX test #-}
+
+  open import Data.Nat.Base
+  open import Data.Nat.Properties using (≤-decTotalOrder)
+  open import Data.List.Base using (List; _∷_; [])
   open import Data.List.Sort ≤-decTotalOrder using (sort)
-  test : List Bool
-  test = sort (true ∷ false ∷ true ∷ false ∷ [])
+
+  test : List ℕ
+  test = sort (42 ∷ 0 ∷ 5 ∷ 3 ∷ [])
   {-# COMPILE AGDA2LAMBOX test #-}
 
-  -- open import Data.Nat.Properties using (≤-decTotalOrder)
-  -- open import Data.Bool using (Bool; true; false)
-  -- open import Data.List.Base using (List; _∷_; [])
-  -- open import Data.List.Sort ≤-decTotalOrder using (sort)
-  -- test : List Bool
-  -- test = sort (42 ∷ 0 ∷ 5 ∷ 3 ∷ [])
-  -- {-# COMPILE AGDA2LAMBOX test #-}
+-- -}

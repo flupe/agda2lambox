@@ -46,6 +46,7 @@ pre {
   <fieldset>
     <button id="run" disabled>Run</button>
     <button id="reload" disabled>Reload</button>
+    <button id="clear">Clear</button>
     <select id="decoder">
       <option value="nat">Nat</option>
       <option value="bool">Bool</option>
@@ -69,6 +70,7 @@ let mem  = null
 on(file,   "change", load)
 on(reload, "click",  load)
 on(run,    "click",  exec)
+on(clear,  "click", () => {output.innerHTML = ""})
 
 async function load() {
   if (file.files.length == 0) return

@@ -104,9 +104,6 @@ agda2lambox = Backend backend
       , mayEraseType          = \ _ -> return True
       }
 
-
-
-
 moduleSetup
   :: Options -> IsMain -> TopLevelModuleName -> Maybe FilePath
   -> TCM (Recompile ModuleEnv ModuleRes)
@@ -130,7 +127,6 @@ writeModule Options{..} menv IsMain m defs = do
 
   let fileName = (outDir </>) . moduleNameToFileName m
       coqMod   = CoqModule env (map qnameToKName programs)
-
 
   liftIO do
     putStrLn $ "Writing " <> fileName ".txt"

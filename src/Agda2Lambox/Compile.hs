@@ -15,11 +15,12 @@ import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Agda.Compiler.Backend
 import Agda.Syntax.Internal ( QName )
-import Agda.Syntax.Common (Arg(..))
+import Agda.Syntax.Common (Arg(..), IsOpaque (TransparentDef))
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.TypeChecking.Monad ( liftTCM, getConstInfo )
 import Agda.TypeChecking.Pretty
 import Agda.Utils.Monad ( whenM, ifM, unlessM, ifNotM, orM, forM_ )
+import Agda.Utils.SmallSet qualified as SmallSet
 
 import Agda.Utils ( hasPragma, isDataOrRecDef, treeless, isArity )
 
@@ -110,7 +111,33 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
       reportSDoc "agda2lambox.compile" 5 $
         "Found primitive: " <> prettyTCM defName <> ". Compiling it as axiom."
 
-      typ <- whenTyped target $ compileTopLevelType defType
-      pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
+      getBuiltinThing (PrimitiveName primName) >>= \case
+        -- it's a primitive with an actual implementation
+        -- we try to convert it to a function, manually
+        Just (Prim (PrimFun{})) -> do
+          let def = Function
+                { funClauses    = primClauses
+                , funCompiled   = primCompiled
+                , funSplitTree  = Nothing
+                , funTreeless   = Nothing
+                , funCovering   = []
+                , funInv        = primInv
+                , funMutual     = Just [defName]
+                , funProjection = Left NeverProjection
+                , funFlags      = SmallSet.empty
+                , funTerminates = Just True
+                , funExtLam     = Nothing
+                , funWith       = Nothing
+                , funIsKanOp    = Nothing
+                , funOpaque     = TransparentDef
+                }
+
+          let defn' = defn {theDef = def}
+          liftTCM $ modifyGlobalDefinition defName $ const defn'
+          compileFunction target defn'
+
+        _ -> do
+          typ <- whenTyped target $ compileTopLevelType defType
+          pure $ Just $ ConstantDecl $ ConstantBody typ Nothing
 
     _ -> genericError $ "Cannot compile: " <> prettyShow defName

@@ -1,58 +1,53 @@
+{-# OPTIONS --erasure #-}
 open import Agda.Builtin.Nat
 
--- we have to redefine addition on builtin nats
--- because the builtin _+_ doesn't compile yet
-add : Nat → Nat → Nat
-add zero y = y
-add (suc x) y = suc (add x y)
-
-variable n : Nat
+variable @0 n : Nat
 
 data Type : Set where
   ℕ   : Type
   _⇒_ : Type → Type → Type
 
-variable α β : Type
+variable @0 α β : Type
 
 infixl 7 _▷_
-data Ctx : Nat → Set where
+data Ctx : @0 Nat → Set where
   []  : Ctx zero
   _▷_ : Ctx n → Type → Ctx (suc n)
 
-variable Γ : Ctx n
+variable @0 Γ : Ctx n
 
 infix 6 _∋_
-data _∋_ : Ctx n → Type → Set where
+data _∋_ : @0 Ctx n → @0 Type → Set where
   here  :          Γ ▷ α ∋ α
   there : Γ ∋ α → Γ ▷ β ∋ α
 
-data Tm (Γ : Ctx n) : Type → Set where
-  var : Γ ∋ α → Tm Γ α
-  lam : Tm (Γ ▷ α) β → Tm Γ (α ⇒ β)
-  app : Tm Γ (α ⇒ β) → Tm Γ α → Tm Γ β
+data _⊢_ (@0 Γ : Ctx n) : @0 Type → Set where
+  var  : Γ ∋ α → Γ ⊢ α
+  lam  : (Γ ▷ α) ⊢ β → Γ ⊢ (α ⇒ β)
+  app  : Γ ⊢ (α ⇒ β) → Γ ⊢ α → Γ ⊢ β
+  lit  : Nat → Γ ⊢ ℕ
+  plus : Γ ⊢ ℕ → Γ ⊢ ℕ → Γ ⊢ ℕ
 
-  lit : Nat → Tm Γ ℕ
-  _`+_ : Tm Γ ℕ → Tm Γ ℕ → Tm Γ ℕ
+Value : Type → Set
+Value ℕ       = Nat
+Value (α ⇒ β) = Value α → Value β
 
-⟦_⟧ : Type → Set
-⟦ ℕ     ⟧ = Nat
-⟦ α ⇒ β ⟧ = ⟦ α ⟧ → ⟦ β ⟧
-
-data Env : Ctx n → Set where
+data Env : @0 Ctx n → Set where
   []  : Env []
-  _▷_ : Env Γ → ⟦ α ⟧ → Env (Γ ▷ α)
+  _▷_ : Env Γ → Value α → Env (Γ ▷ α)
 
-lookupEnv : Env Γ → Γ ∋ α → ⟦ α ⟧
+lookupEnv : Env Γ → Γ ∋ α → Value α
 lookupEnv (env ▷ x) here = x
 lookupEnv (env ▷ _) (there k) = lookupEnv env k
 
-eval : Env Γ → Tm Γ α → ⟦ α ⟧
-eval env (var k)   = lookupEnv env k
-eval env (lam u)   = λ x → eval (env ▷ x) u
-eval env (app u v) = eval env u (eval env v)
-eval env (lit x)   = x
-eval env (u `+ v)   = add (eval env u) (eval env v)
+eval : Env Γ → Γ ⊢ α → Value α
+eval env (var k)    = lookupEnv env k
+eval env (lam u)    = λ x → eval (env ▷ x) u
+eval env (app u v)  = eval env u (eval env v)
+eval env (lit x)    = x
+eval env (plus u v) = eval env u + eval env v
 
+-- (λ x → x + 1) 1
 test : Nat
-test = eval [] (app (lam (lit 1 `+ var here)) (lit 1))
+test = eval [] (app (lam (plus (lit 1) (var here))) (lit 1)) 
 {-# COMPILE AGDA2LAMBOX test #-}
