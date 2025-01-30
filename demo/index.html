@@ -55,9 +55,6 @@ pre {
     </select>
     <input type="file" id="file" />
   </fieldset>
-  <fieldset>
-  <input type="text"/>
-  </fieldset>
 </header>
 <pre><code id="output"></code></pre>
 <script type="module">
@@ -102,10 +99,13 @@ async function load() {
 
 async function exec() {
   log("Running main_function()")
+
   wasm.exports.main_function()
+
+  mem = new Uint32Array(wasm.exports.memory.buffer)
   let res = wasm.exports.result.value
   let dec = decoders[decoder.value]
-  mem = new Uint32Array(wasm.exports.memory.buffer)
+  // mem = new Uint32Array(wasm.exports.memory.buffer)
   log(`Result: ${pretty(dec(res))}`)
 }
 
