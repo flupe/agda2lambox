@@ -110,7 +110,8 @@ agda2lambox = Backend backend
 moduleSetup
   :: Options -> IsMain -> TopLevelModuleName -> Maybe FilePath
   -> TCM (Recompile ModuleEnv ModuleRes)
-moduleSetup _ _ m _ = do
+moduleSetup _ NotMain m _ = pure $ Skip ()
+moduleSetup _ IsMain m _ = do
   setScope . iInsideScope =<< curIF
   pure $ Recompile ()
 

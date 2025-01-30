@@ -12,7 +12,7 @@ import Data.List ( elemIndex, foldl', singleton )
 import Data.Maybe ( fromMaybe, listToMaybe )
 import Data.Foldable ( foldrM )
 
-import Agda.Compiler.Backend ( MonadTCState, HasOptions )
+import Agda.Compiler.Backend ( MonadTCState, HasOptions, canonicalName )
 import Agda.Compiler.Backend ( getConstInfo, theDef, pattern Datatype, dataMutual )
 import Agda.Syntax.Abstract.Name ( ModuleName(..), QName(..) )
 import Agda.Syntax.Builtin ( builtinNat, builtinZero, builtinSuc )
@@ -99,6 +99,7 @@ compileTermC = \case
   --   - they cannot be propositions.
   --   - they cannot be types.
   TDef qn -> do
+    qn <- liftTCM $ canonicalName qn
     CompileEnv{mutuals, boundVars} <- ask
     case qn `elemIndex` mutuals of
       Nothing -> do lift $ requireDef qn
@@ -106,6 +107,7 @@ compileTermC = \case
       Just i  -> pure $ LRel  $ i + boundVars
 
   TCon q -> do
+    q <- liftTCM $ canonicalName q
     lift $ requireDef q
     liftTCM $ toConApp q []
 
@@ -113,6 +115,7 @@ compileTermC = \case
   TApp (TPrim PSeq) args -> compileTermC (last args)
 
   TApp (TCon q) args -> do
+    q <- liftTCM $ canonicalName q
     lift $ requireDef q
     traverse compileTermC args
       >>= liftTCM . toConApp q
@@ -175,6 +178,7 @@ compileLitPattern = \case
 compileCaseType :: CaseType -> C LBox.Inductive
 compileCaseType = \case
   CTData qn -> do
+    qn <- liftTCM $ canonicalName qn
     lift $ requireDef qn
     liftTCM $ toInductive qn
   CTNat -> do

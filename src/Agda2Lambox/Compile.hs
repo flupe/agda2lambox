@@ -6,13 +6,20 @@ module Agda2Lambox.Compile
 import Control.Monad.IO.Class ( liftIO )
 import Data.IORef
 
+import Control.Monad.State
+
+import Data.Bifunctor (bimap)
+import Data.Set (Set)
+import Data.Map (Map)
+import Data.Map qualified as Map
+import Data.Set qualified as Set
 import Agda.Compiler.Backend
 import Agda.Syntax.Internal ( QName )
 import Agda.Syntax.Common (Arg(..))
 import Agda.Syntax.Common.Pretty ( prettyShow )
 import Agda.TypeChecking.Monad ( liftTCM, getConstInfo )
 import Agda.TypeChecking.Pretty
-import Agda.Utils.Monad ( whenM, ifM, unlessM, ifNotM, orM )
+import Agda.Utils.Monad ( whenM, ifM, unlessM, ifNotM, orM, forM_ )
 
 import Agda.Utils ( hasPragma, isDataOrRecDef, treeless, isArity )
 
@@ -29,12 +36,46 @@ import LambdaBox.Env (GlobalEnv(..), GlobalDecl(..), ConstantBody(..))
 import LambdaBox.Type qualified as LamBox
 
 import Agda2Lambox.Compile.Type (compileTopLevelType)
+import Data.Foldable (foldrM)
+import Agda.Utils.Maybe (catMaybes, mapMaybe, isJust)
 
 -- | Compile the given names to a λ□ environment.
 compile :: Target t -> [QName] -> TCM (GlobalEnv t)
-compile t qs = GlobalEnv <$> compileLoop (compileDefinition t) qs
+compile t qs = do
+  items <- topoSort <$> compileLoop (compileDefinition t) qs
 
-compileDefinition :: Target t -> Definition -> CompileM (Maybe (KerName, GlobalDecl t))
+  let skipped = flip mapMaybe items \item ->
+        case itemValue item of
+          Nothing -> Nothing
+          Just x  -> Just (item { itemValue = x })
+
+  pure $ GlobalEnv $ flip map skipped \CompiledItem{..} ->
+    (qnameToKName itemName, itemValue)
+
+
+-- TODO(flupe): move this somewhere else
+type TopoM a = State (Set QName, [CompiledItem a])
+
+topoSort :: forall a. [CompiledItem a] -> [CompiledItem a]
+topoSort defs = snd $ execState (traverse (visit Set.empty) defs) (Set.empty, [])
+  where
+    items = Map.fromList $ map (\x -> (itemName x, x)) defs
+
+    isMarked :: QName -> TopoM a Bool
+    isMarked q = Set.member q <$> gets fst
+
+    push :: CompiledItem a -> TopoM a ()
+    push item@CompiledItem{itemName} = modify $ bimap (Set.insert itemName) (item:)
+
+    visit :: Set QName -> CompiledItem a -> TopoM a ()
+    visit temp item@CompiledItem{..} = do
+      unlessM ((Set.member itemName temp ||) <$> isMarked itemName) do
+        let deps = catMaybes $ (`Map.lookup` items) <$> itemDeps
+        traverse (visit (Set.insert itemName temp)) deps
+        push item
+
+
+compileDefinition :: Target t -> Definition -> CompileM (Maybe (GlobalDecl t))
 compileDefinition target defn@Defn{..} = setCurrentRange defName do
   reportSDoc "agda2lambox.compile" 1 $ "Compiling definition: " <+> prettyTCM defName
 
@@ -45,8 +86,8 @@ compileDefinition target defn@Defn{..} = setCurrentRange defName do
          , liftTCM $ isLogical $ Arg defArgInfo defType])
     (pure Nothing) do
 
-  -- prepend kername
-  fmap (qnameToKName defName,) <$> case theDef of
+  case theDef of
+    PrimitiveSort{}    -> pure Nothing
     GeneralizableVar{} -> pure Nothing
 
     Axiom{} -> do
