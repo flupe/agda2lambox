@@ -35,7 +35,7 @@ import Agda2Lambox.Compile.Monad
 -- * Term compilation monad
 
 -- | λ□ compilation environment.
-data CompileEnv = CompileEnv
+data TermEnv = TermEnv
   { mutuals   :: [QName]
     -- ^ When we compile mutual function definitions,
     -- they are introduced at the top of the local context.
@@ -45,14 +45,14 @@ data CompileEnv = CompileEnv
 
 -- | Initial compilation environment.
 -- No mutuals, no bound variables.
-initEnv :: CompileEnv
-initEnv = CompileEnv
+initEnv :: TermEnv
+initEnv = TermEnv
   { mutuals   = []
   , boundVars = 0
   }
 
 -- | Compilation monad.
-type C a = ReaderT CompileEnv CompileM a
+type C a = ReaderT TermEnv CompileM a
 
 -- | Run a compilation unit in @TCM@, in the initial environment.
 runC :: C a -> CompileM a
@@ -100,7 +100,7 @@ compileTermC = \case
   --   - they cannot be types.
   TDef qn -> do
     qn <- liftTCM $ canonicalName qn
-    CompileEnv{mutuals, boundVars} <- ask
+    TermEnv{mutuals, boundVars} <- ask
     case qn `elemIndex` mutuals of
       Nothing -> do lift $ requireDef qn
                     pure $ LConst $ qnameToKName qn
@@ -109,7 +109,7 @@ compileTermC = \case
   TCon q -> do
     q <- liftTCM $ canonicalName q
     lift $ requireDef q
-    liftTCM $ toConApp q []
+    lift $ toConApp q []
 
   -- TODO: maybe not ignore seq? (c.f. issue #12)
   TApp (TPrim PSeq) args -> compileTermC (last args)
@@ -118,7 +118,7 @@ compileTermC = \case
     q <- liftTCM $ canonicalName q
     lift $ requireDef q
     traverse compileTermC args
-      >>= liftTCM . toConApp q
+      >>= lift . toConApp q
   -- ^ For dealing with fully-applied constructors
 
   TApp u es -> do
@@ -154,26 +154,14 @@ compileLit = \case
     qn <- liftTCM $ getBuiltinName_ builtinNat
     qz <- liftTCM $ getBuiltinName_ builtinZero
     qs <- liftTCM $ getBuiltinName_ builtinSuc
-    z  <- liftTCM $ toConApp qz []
-    let ss = take (fromInteger i) $ repeat (toConApp qs . singleton)
-    lift $ requireDef qn
-    liftTCM $ foldrM ($) z ss
+    lift do
+      requireDef qn
+      iterate (toConApp qs . singleton =<<) 
+              (toConApp qz []) 
+        !! fromInteger i
 
   l -> genericError $ "unsupported literal: " <> prettyShow l
 
-compileLitPattern :: Literal -> C LBox.Term
-compileLitPattern = \case
-
-  LitNat i -> do
-    qn <- liftTCM $ getBuiltinName_ builtinNat
-    qz <- liftTCM $ getBuiltinName_ builtinZero
-    qs <- liftTCM $ getBuiltinName_ builtinSuc
-    z  <- liftTCM $ toConApp qz []
-    let ss = take (fromInteger i) $ repeat (toConApp qs . singleton)
-    lift $ requireDef qn
-    liftTCM $ foldrM ($) z ss
-
-  l -> genericError $ "unsupported literal: " <> prettyShow l
 
 compileCaseType :: CaseType -> C LBox.Inductive
 compileCaseType = \case

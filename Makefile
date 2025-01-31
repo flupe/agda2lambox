@@ -2,10 +2,16 @@
 	agda2lambox -o build test/$*.agda
 
 %.wasm: %.ast
-	lbox wasm -o demo/$*.wasm build/$*.ast
+	lbox wasm -o demo/$@ build/$*.ast
+
+%.elm: %.typed
+	lbox elm -o demo/$@ build/$*.ast
+
+%.rs: %.typed
+	lbox rust -o demo/$@ build/$*.ast
 
 %.v:
 	agda2lambox -o build --rocq test/$*.agda
 
 %.typed:
-	agda2lambox -o build --typed test/$*.agda
+	agda2lambox -o build --typed --no-blocks test/$*.agda

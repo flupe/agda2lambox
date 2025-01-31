@@ -32,6 +32,7 @@ import Agda2Lambox.Compile       (compile)
 import CoqGen    ( prettyCoq  )
 import SExpr     ( prettySexp )
 import LambdaBox.Env
+import Agda2Lambox.Compile.Monad (runCompile, CompileEnv(..))
 
 
 main :: IO ()
@@ -42,13 +43,14 @@ data Output = RocqOutput | AstOutput
 
 -- | Backend options.
 data Options = forall t. Options
-  { optOutDir :: Maybe FilePath
-  , optTarget :: Target t
-  , optOutput :: Output
+  { optOutDir   :: Maybe FilePath
+  , optTarget   :: Target t
+  , optOutput   :: Output
+  , optNoBlocks :: Bool
   }
 
 instance NFData Options where
-  rnf (Options m t o) = rnf m `seq` rnf t `seq` rnf o
+  rnf (Options m t o nb) = rnf m `seq` rnf t `seq` rnf o `seq` rnf nb
 
 -- | Setter for output directory option.
 outdirOpt :: Monad m => FilePath -> Options -> m Options
@@ -60,12 +62,16 @@ typedOpt opts = return opts { optTarget = ToTyped }
 rocqOpt :: Monad m => Options -> m Options
 rocqOpt opts = return opts { optOutput = RocqOutput }
 
+noBlocksOpt :: Monad m => Options -> m Options
+noBlocksOpt opts = return opts { optNoBlocks = True }
+
 -- | Default backend options.
 defaultOptions :: Options
-defaultOptions = Options
-  { optOutDir = Nothing
-  , optTarget = ToUntyped
-  , optOutput = AstOutput
+defaultOptions  = Options
+  { optOutDir   = Nothing
+  , optTarget   = ToUntyped
+  , optOutput   = AstOutput
+  , optNoBlocks = False
   }
 
 -- | Backend module environments.
@@ -90,6 +96,8 @@ agda2lambox = Backend backend
             "Compile to typed λ□ environments."
           , Option ['c'] ["rocq"] (NoArg rocqOpt) 
             "Output a Rocq file."
+          , Option [] ["no-blocks"] (NoArg noBlocksOpt) 
+            "Disable constructors as blocks."
           ]
       , isEnabled             = \ _ -> True
       , preCompile            = return
@@ -116,7 +124,7 @@ writeModule
 writeModule opts menv NotMain _ _   = pure ()
 writeModule Options{..} menv IsMain m defs = do
   outDir   <- flip fromMaybe optOutDir <$> compileDir
-  env      <- compile optTarget defs
+  env      <- runCompile (CompileEnv optNoBlocks) $ compile optTarget defs
   programs <- filterM hasPragma defs
 
   liftIO $ createDirectoryIfMissing True outDir

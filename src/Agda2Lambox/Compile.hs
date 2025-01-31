@@ -34,7 +34,7 @@ import LambdaBox.Env (GlobalEnv(..), GlobalDecl(..), ConstantBody(..))
 
 
 -- | Compile the given names into to a λ□ environment.
-compile :: Target t -> [QName] -> TCM (GlobalEnv t)
+compile :: Target t -> [QName] -> CompileM (GlobalEnv t)
 compile t qs = do
   items <- compileLoop (compileDefinition t) qs
   pure $ GlobalEnv $ map itemToEntry items

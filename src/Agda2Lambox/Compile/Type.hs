@@ -34,7 +34,7 @@ import Agda.TypeChecking.Telescope (telView)
 data VarType = TypeVar Int | Other
 
 -- | λ□ type compilation environment.
-data CompileEnv = CompileEnv
+data TypeEnv = TypeEnv
   { typeVars   :: Int
     -- ^ How many type variables we have.
   , boundVars  :: Int
@@ -47,8 +47,8 @@ data CompileEnv = CompileEnv
   }
 
 -- | Initialize compilation environment with a given number of type variables.
-initEnv :: Int -> CompileEnv
-initEnv tvs = CompileEnv
+initEnv :: Int -> TypeEnv
+initEnv tvs = TypeEnv
   { typeVars   = tvs
   , boundVars  = tvs
   , boundTypes = reverse $ TypeVar <$> [0 .. tvs - 1]
@@ -73,7 +73,7 @@ underTypeVar :: Dom Type -> C a -> C a
 underTypeVar b x = do
   shouldInsert <- asks insertVars
   if shouldInsert then
-    addContext b $ local (\e@CompileEnv{..} -> e
+    addContext b $ local (\e@TypeEnv{..} -> e
       { typeVars   = typeVars + 1
       , boundVars  = boundVars + 1
       , boundTypes = TypeVar typeVars : boundTypes
@@ -81,7 +81,7 @@ underTypeVar b x = do
   else underBinder b x
 
 -- | Type compilation monad.
-type C a = ReaderT CompileEnv CompileM a
+type C a = ReaderT TypeEnv CompileM a
 
 
 -- | Compile constructor arguments' types, given a set number of type variables.
