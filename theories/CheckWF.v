@@ -58,6 +58,18 @@ Fixpoint check_wf_glob {efl : EEnvFlags} (decls : global_declarations) : bool :=
   | p::ds => check_wf_glob ds && check_fresh_global (fst p) ds && wf_global_decl ds (snd p)
   end.
 
+Fixpoint check_wf_glob' {efl : EEnvFlags} (decls : global_declarations) : option kername :=
+  match decls with
+  | []    => None
+  | p::ds =>
+    match check_wf_glob' ds with
+      | Some x => Some x
+      | None   => if check_fresh_global (fst p) ds && wf_global_decl ds (snd p) then
+                    None
+                  else Some (fst p)
+    end
+  end.
+
 Definition check_wf_program {efl : EEnvFlags} (p : program) : bool :=
   check_wf_glob (fst p) && wellformed (fst p) 0 (snd p).
 

@@ -102,13 +102,21 @@ async function load() {
 async function exec() {
   log("Running main_function()")
 
-  wasm.exports.main_function()
+  try {
+    wasm.exports.main_function()
 
-  mem = new Uint32Array(wasm.exports.memory.buffer)
-  let res = wasm.exports.result.value
-  let dec = decoders[decoder.value]
-  // mem = new Uint32Array(wasm.exports.memory.buffer)
-  log(`Result: ${pretty(dec(res))}`)
+    mem = new Uint32Array(wasm.exports.memory.buffer)
+    let res = wasm.exports.result.value
+    let dec = decoders[decoder.value]
+    // mem = new Uint32Array(wasm.exports.memory.buffer)
+    log(`Result: ${pretty(dec(res))}`)
+  } catch (e) {
+    log(`Failed to run: ${e}`, true)
+    if (wasm.exports.out_of_mem.value) {
+      log(`Wasm instance may have run out of memory...`, true)
+    }
+    throw e
+  }
 }
 
 function log(str, err = false) { // ugly logging

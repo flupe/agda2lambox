@@ -48,7 +48,6 @@ import Agda.Compiler.Treeless.AsPatterns
 import Agda.Compiler.Treeless.Builtin
 import Agda.Compiler.Treeless.Erase
 import Agda.Compiler.Treeless.Identity
-import Agda.Compiler.Treeless.Simplify
 import Agda.Compiler.Treeless.Uncase
 import Agda.Compiler.Treeless.Unused
 import Agda.Compiler.Treeless.NormalizeNames
@@ -67,6 +66,7 @@ import Agda.Utils.Impossible
 
 import Agda.Utils.EliminateDefaults
 import Agda.Utils.EtaExpandConstructors
+import Agda.Utils.Simplify
 
 prettyPure :: P.Pretty a => a -> TCM Doc
 prettyPure = return . P.pretty
@@ -186,8 +186,8 @@ compilerPipeline v q =
 
     -- [ compilerPass "builtin" (30 + v) "builtin translation" $ const translateBuiltins
     [ FixedPoint 5 $ Sequential
-      [ compilerPass "simpl"  (30 + v) "simplification"     $ const simplifyTTerm
-      , compilerPass "erase"  (30 + v) "erasure"            $ eraseTerms q
+      -- [ compilerPass "simpl"  (30 + v) "simplification"     $ const simplifyTTerm
+      [ compilerPass "erase"  (30 + v) "erasure"            $ eraseTerms q
       , compilerPass "uncase" (30 + v) "uncase"             $ const caseToSeq
       , compilerPass "aspat"  (30 + v) "@-pattern recovery" $ const recoverAsPatterns
       ]

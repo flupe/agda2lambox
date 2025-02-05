@@ -30,6 +30,7 @@ import Agda2Lambox.Compile.Type       ( compileTopLevelType )
 
 import LambdaBox.Names
 import LambdaBox.Env (GlobalEnv(..), GlobalDecl(..), ConstantBody(..))
+import LambdaBox.Term (Term(LBox))
 
 
 
@@ -47,12 +48,15 @@ compileDefinition :: Target t -> Definition -> CompileM (Maybe (GlobalDecl t))
 compileDefinition target defn@Defn{..} = setCurrentRange defName do
   reportSDoc "agda2lambox.compile" 1 $ "Compiling definition: " <+> prettyTCM defName
 
-  -- we skip logical definitions altogether,
-  -- and definitions introduced by module application
-  ifM
-    (orM [ pure defCopy
-         , liftTCM $ isLogical $ Arg defArgInfo defType])
-    (pure Nothing) do
+  -- we skip definitions introduced by module application
+
+  if defCopy then pure Nothing else do
+
+  typ <- whenTyped target $ compileTopLevelType defType
+
+  -- logical definitions are immediately compiled to □
+  ifM (liftTCM $ isLogical $ Arg defArgInfo defType)
+     (pure $ Just $ ConstantDecl $ ConstantBody typ $ Just LBox) do
 
   case theDef of
     PrimitiveSort{}    -> pure Nothing

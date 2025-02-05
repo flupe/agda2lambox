@@ -20,6 +20,7 @@ executable agda2lambox
   other-modules:       Agda.Utils,
                        Agda.Utils.EliminateDefaults,
                        Agda.Utils.EtaExpandConstructors,
+                       Agda.Utils.Simplify,
                        Agda.Utils.Treeless,
                        Agda2Lambox.Compile.Target,
                        Agda2Lambox.Compile.Utils,
